@@ -1,0 +1,131 @@
+/* ASTAT — чёрный, белый, моноширинный. Последний слой поверх всех тем: подключать после остальных стилей. */
+html.neon, html.neon[data-design='orbit-signature'] {
+  --r-card: 6px; --r-ctl: 4px; --r-pill: 4px;
+  --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+}
+html.neon:not([data-theme='light']), html.neon[data-design='orbit-signature'] {
+  --bg: 0 0 0; --surface: 10 10 10; --surface-2: 20 20 20; --border: 44 44 44;
+  --text: 240 240 240; --text-muted: 150 150 150;
+  --primary: 255 255 255; --primary-2: 240 240 240; --primary-fg: 0 0 0; --accent: 255 255 255;
+  --hair: #ffffff24; --card-flat: #0a0a0a; --press: #ffffff0f; --design-nav: #000000f2; --hero-glow: transparent;
+  --gradient-hero: linear-gradient(#0a0a0a, #0a0a0a);
+}
+html.neon[data-theme='light'] {
+  --bg: 255 255 255; --surface: 255 255 255; --surface-2: 244 244 244; --border: 214 214 214;
+  --text: 10 10 10; --text-muted: 100 100 100;
+  --primary: 0 0 0; --primary-2: 10 10 10; --primary-fg: 255 255 255; --accent: 0 0 0;
+  --hair: #00000026; --card-flat: #fff; --press: #0000000a; --design-nav: #fffffff2; --hero-glow: transparent;
+  --gradient-hero: linear-gradient(#111, #111);
+}
+html.neon body, html.neon[data-design] body { background: rgb(var(--bg)) !important; background-image: none !important; }
+
+/* геометрия: острые углы и 1px вместо теней и свечения */
+html.neon .card, html.neon .orbit-row, html.neon .orbit-stat, html.neon .orbit-hero, html.neon .signature-lte,
+html.neon .signature-membership, html.neon .signature-plan, html.neon .signature-included,
+html.neon .orbit-announcement, html.neon .orbit-promo, html.neon .orbit-gift, html.neon .orbit-help,
+html.neon .tabbar, html.neon .tabbar .vg-ind, html.neon .orbit-avatar, html.neon input, html.neon select, html.neon textarea,
+html.neon .orbit-cta, html.neon button.bg-gradient-to-br, html.neon .signature-purchase {
+  border-radius: var(--r-card) !important; box-shadow: none !important;
+}
+html.neon .orbit-hero { background: transparent !important; border: 0 !important; padding-inline: 0; }
+html.neon .orbit-hero::before, html.neon .hero-bg::before { display: none; }
+html.neon .hero-bg { background: rgb(var(--surface)) !important; color: rgb(var(--text)) !important; border: 1px solid var(--hair); box-shadow: none !important; }
+html.neon .shadow-glow { box-shadow: none !important; }
+
+/* основная кнопка инвертирована */
+html.neon .orbit-cta, html.neon button.bg-gradient-to-br, html.neon .signature-purchase {
+  background: rgb(var(--primary)) !important; background-image: none !important; color: rgb(var(--primary-fg)) !important;
+  font-family: var(--mono); font-weight: 700; letter-spacing: 0;
+}
+html.neon .signature-cta-icon { background: transparent !important; color: inherit !important; }
+html.neon .tabbar .vg-ind { background: rgb(var(--primary) / .12) !important; }
+
+/* моноширинный шрифт для заголовков, цифр и служебных подписей */
+html.neon .page-title, html.neon .orbit-wordmark, html.neon .orbit-section-title, html.neon .signature-hero-copy h1,
+html.neon .signature-plan-title, html.neon .signature-plan-price b, html.neon .num, html.neon h1, html.neon h2 {
+  font-family: var(--mono) !important; letter-spacing: -.03em !important;
+}
+html.neon .tabbar a { font-family: var(--mono); }
+
+/* ASCII-графика */
+.ascii-canvas { display: block; width: 100%; height: 100%; color: rgb(var(--text)); }
+.ascii-hands { width: 100%; aspect-ratio: 2 / 1; }
+.ascii-globe { width: 100%; max-width: 460px; aspect-ratio: 1.1 / 1; margin: auto; }
+html.neon .ascii-art { height: 210px !important; margin: 0 0 8px !important; display: block; }
+html.neon .ascii-art .ascii-globe { height: 100%; width: auto; }
+
+/* сайт */
+.site { min-height: 100dvh; display: flex; flex-direction: column; background: rgb(var(--bg)); color: rgb(var(--text)); }
+.site main { flex: 1; }
+.site-wrap { width: 100%; max-width: 1160px; margin-inline: auto; padding-inline: 24px; }
+.site-head { display: flex; align-items: center; gap: 28px; max-width: 1160px; width: 100%; margin: auto; padding: 20px 24px; font-family: var(--mono); font-size: 13px; }
+.site-logo { font-weight: 800; letter-spacing: .08em; font-size: 15px; white-space: nowrap; }
+.site-nav { display: flex; gap: 22px; margin-right: auto; }
+.site-nav a { color: rgb(var(--text-muted)); transition: color .15s; }
+.site-nav a:hover, .site-nav a.active { color: rgb(var(--text)); }
+.site-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; border: 1px solid rgb(var(--text)); border-radius: 4px; background: rgb(var(--text)); color: rgb(var(--bg)); font-family: var(--mono); font-size: 14px; font-weight: 700; white-space: nowrap; transition: opacity .15s, background-color .15s, color .15s; }
+.site-btn:hover { opacity: .85; }
+.site-btn-ghost { background: transparent; color: rgb(var(--text)); border-color: var(--hair); }
+.site-btn-ghost:hover { opacity: 1; border-color: rgb(var(--text)); }
+.site-btn-sm { min-height: 36px; padding: 0 14px; font-size: 13px; }
+.site-tag { font-family: var(--mono); font-size: 12px; color: rgb(var(--text-muted)); margin-bottom: 14px; }
+.site-tag::before { content: '> '; }
+.site-hero { position: relative; overflow: hidden; }
+.site-hero .ascii-hands { max-width: min(1500px, 112vh); margin: 0 auto; }
+.site-hero-copy { margin-top: -2%; position: relative; padding-bottom: 32px; }
+.site-hero h1 { font-size: clamp(32px, 5.4vw, 64px); font-weight: 800; line-height: 1.05; max-width: 16em; }
+.site-hero p { max-width: 36em; margin-top: 18px; font-size: 17px; line-height: 1.55; color: rgb(var(--text-muted)); }
+.site-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.site-section { padding-block: 56px; }
+.site-section-tight { padding-top: 16px; }
+.site-section h2 { font-size: clamp(22px, 3vw, 30px); font-weight: 800; margin-bottom: 24px; }
+.site-section h2 span { color: rgb(var(--text-muted)); }
+.site-grid { display: grid; gap: 1px; background: var(--hair); border: 1px solid var(--hair); }
+.site-grid-3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); }
+.site-grid-4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.site-card { background: rgb(var(--bg)); padding: 24px; display: flex; flex-direction: column; gap: 8px; }
+.site-card h3 { font-family: var(--mono); font-size: 16px; font-weight: 700; }
+.site-card p { font-size: 14px; line-height: 1.55; color: rgb(var(--text-muted)); }
+.site-num { font-family: var(--mono); font-size: 12px; color: rgb(var(--text-muted)); margin-bottom: 18px; }
+.site-muted { color: rgb(var(--text-muted)); font-size: 14px; }
+.site-plan-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.site-chip { font-family: var(--mono); font-size: 11px; border: 1px solid var(--hair); padding: 2px 6px; border-radius: 3px; }
+.site-price { font-family: var(--mono); font-size: 30px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; margin-top: 8px; }
+.site-plan ul { margin: 12px 0 18px; display: grid; gap: 6px; font-size: 14px; color: rgb(var(--text-muted)); }
+.site-plan li::before { content: '+ '; font-family: var(--mono); }
+.site-plan .site-btn { margin-top: auto; }
+.site-split { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; }
+.site-steps { display: grid; gap: 22px; }
+.site-steps li { display: flex; gap: 18px; }
+.site-steps b { font-family: var(--mono); font-size: 24px; line-height: 1; }
+.site-steps h3 { font-weight: 700; font-size: 16px; }
+.site-steps p { margin-top: 4px; font-size: 14px; line-height: 1.55; color: rgb(var(--text-muted)); }
+.site-pagehead { padding-block: 40px 16px; }
+.site-pagehead h1 { font-size: clamp(30px, 5vw, 52px); font-weight: 800; line-height: 1.08; }
+.site-pagehead p { max-width: 40em; margin-top: 14px; color: rgb(var(--text-muted)); line-height: 1.55; }
+.site-faq details { border-bottom: 1px solid var(--hair); padding-block: 18px; max-width: 780px; }
+.site-faq summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+.site-faq summary::-webkit-details-marker { display: none; }
+.site-faq summary::after { content: '+'; font-family: var(--mono); }
+.site-faq details[open] summary::after { content: '-'; }
+.site-faq p { margin-top: 10px; color: rgb(var(--text-muted)); line-height: 1.55; font-size: 15px; }
+.site-doc { max-width: 780px; margin-inline: 0; }
+.site-doc { margin-inline: auto; }
+.site-doc h3 { font-family: var(--mono); font-weight: 700; margin-top: 24px; }
+.site-doc p { margin-top: 8px; line-height: 1.6; color: rgb(var(--text-muted)); }
+.site-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; width: 100%; max-width: 1160px; margin: auto; padding: 32px 24px; font-family: var(--mono); font-size: 12px; color: rgb(var(--text-muted)); }
+.site-foot nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.site-foot a:hover { color: rgb(var(--text)); }
+@media (max-width: 760px) {
+  .site-head { flex-wrap: wrap; gap: 12px; padding: 16px; justify-content: space-between; }
+  .site-nav { order: 3; width: 100%; margin: 0; gap: 16px; overflow-x: auto; }
+  .site-wrap { padding-inline: 16px; }
+  .site-foot { padding-inline: 16px; }
+  .site-split { grid-template-columns: 1fr; }
+  .site-hero-copy { margin-top: 8px; }
+  .site-section { padding-block: 36px; }
+  .site-actions .site-btn { flex: 1 1 100%; }
+}
+
+/* единые острые углы для карточек с утилитарными скруглениями; круглые элементы остаются круглыми */
+html.neon [class*='rounded-']:not(.rounded-full):not([class*='rounded-full']) { border-radius: 6px !important; }

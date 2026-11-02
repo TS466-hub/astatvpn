@@ -1,0 +1,125 @@
+/* ===== Тема «Violet Glass» Mini App — та же, что у админки. Действует, пока пользователь не выбрал светлую тему. ===== */
+html.neon:not([data-theme='light']) {
+  --bg: 9 9 9;
+  --surface: 21 21 21;
+  --surface-2: 34 34 34;
+  --border: 61 61 61;
+  --text: 241 241 241;
+  --text-muted: 157 157 157;
+  --primary: 128 128 128;
+  --primary-2: 130 130 130;
+  --primary-fg: 255 255 255;
+  --accent: 34 211 160;
+  --success: 34 211 160;
+  --warning: 251 191 36;
+  --danger: 251 82 120;
+  --gradient-hero: linear-gradient(130deg, #616161 0%, #808080 40%, #858585 75%, #828282 110%);
+  --glass-line: rgba(255,255,255, .08);
+  color-scheme: dark;
+}
+html.neon { font-family: 'Manrope', Inter, system-ui, sans-serif; }
+html.neon:not([data-theme='light']) body {
+  background-color: #090909;
+  background-image:
+    radial-gradient(760px 460px at 10% -8%, rgba(128,128,128, .28), transparent 62%),
+    radial-gradient(640px 440px at 100% 12%, rgba(130,130,130, .16), transparent 60%),
+    radial-gradient(560px 400px at 50% 108%, rgba(97,97,97, .16), transparent 60%);
+  background-attachment: fixed;
+}
+html.neon h1, html.neon h2, html.neon .font-display { font-family: 'Unbounded', 'Manrope', sans-serif; letter-spacing: -.012em; }
+html.neon h1 { font-weight: 800; }
+html.neon:not([data-theme='light']) .page-title { background: linear-gradient(90deg, #ffffff 0%, #ffffff 55%, #c9c9c9 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ---------- стеклянные карточки ---------- */
+html.neon:not([data-theme='light']) .card {
+  background: linear-gradient(160deg, rgba(255,255,255, .06), rgba(255,255,255, .022));
+  border: 1px solid var(--glass-line);
+  border-radius: 20px;
+  box-shadow: 0 18px 40px -18px rgba(0,0,0, .75), inset 0 1px 0 rgba(255,255,255, .05);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  transition: transform .45s cubic-bezier(.2, .8, .2, 1), box-shadow .3s, border-color .3s;
+}
+html.neon:not([data-theme='light']) a.card:hover, html.neon:not([data-theme='light']) button.card:hover { border-color: rgba(163,163,163, .35); box-shadow: 0 22px 50px -20px rgba(0,0,0, .8), 0 0 40px -12px rgba(128,128,128, .45); }
+html.neon:not([data-theme='light']) .glass { background: rgba(13,13,13, .78); border-color: var(--glass-line); }
+html.neon .hero-bg { background: var(--gradient-hero); background-size: 140% 140%; }
+html.neon:not([data-theme='light']) input, html.neon:not([data-theme='light']) select, html.neon:not([data-theme='light']) textarea { background-color: rgba(255,255,255, .045) !important; border-color: rgba(255,255,255, .1) !important; }
+html.neon:not([data-theme='light']) input:focus, html.neon:not([data-theme='light']) textarea:focus { border-color: rgba(163,163,163, .6) !important; box-shadow: 0 0 0 4px rgba(128,128,128, .16) !important; }
+html.neon:not([data-theme='light']) button.bg-gradient-to-br { background-image: linear-gradient(120deg, #808080, #858585 55%, #828282); box-shadow: 0 8px 26px -8px rgba(133,133,133, .75), inset 0 1px 0 rgba(255,255,255, .25); }
+
+/* ---------- 3D-наклон (класс .tilt, только мышь) ---------- */
+html.neon .tilt { transform-style: preserve-3d; transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+html.neon .tilt::after { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255, .09), transparent 45%); opacity: var(--glare, 0); transition: opacity .3s; }
+html.neon .tilt.tilting { transition: transform .08s linear, box-shadow .3s, border-color .3s; }
+
+/* ---------- навигация ---------- */
+.vg-pills { display: flex; gap: 2px; padding: 5px; border-radius: 999px; background: rgba(255,255,255, .04); border: 1px solid var(--glass-line); position: relative; }
+.vg-pill { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 999px; color: rgb(var(--text-muted)); font-weight: 700; font-size: 14px; white-space: nowrap; transition: color .25s; }
+.vg-pill:hover, .vg-pill.on { color: rgb(var(--text)); }
+.vg-ind { position: absolute; z-index: 0; border-radius: 999px; background: linear-gradient(120deg, rgba(128,128,128, .34), rgba(130,130,130, .24)); box-shadow: inset 0 0 0 1px rgba(163,163,163, .55), 0 0 22px rgba(128,128,128, .45); transition: left .45s cubic-bezier(.2, .9, .25, 1.1), width .45s cubic-bezier(.2, .9, .25, 1.1), opacity .3s; }
+.tabbar { position: fixed; left: 12px; right: 12px; bottom: calc(10px + var(--safe-bottom)); z-index: 40; height: 66px; border-radius: 24px; display: flex; align-items: stretch; padding: 6px;
+  background: rgba(16,16,16, .86); border: 1px solid rgba(255,255,255, .09); box-shadow: 0 20px 50px -12px rgba(0,0,0, .9), 0 0 40px -18px rgba(128,128,128, .6); -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%); }
+html[data-theme='light'] .tabbar { background: rgba(255,255,255, .9); border-color: rgb(var(--border)); box-shadow: 0 12px 30px -10px rgba(23,23,23, .25); }
+.tabbar .vg-ind { top: 6px; bottom: 6px; border-radius: 18px; }
+.tabbar a { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10.5px; font-weight: 700; color: rgb(var(--text-muted)); transition: color .25s; }
+.tabbar a.on { color: rgb(var(--text)); }
+.tabbar a.on svg { color: #c9c9c9; filter: drop-shadow(0 0 8px rgba(133,133,133, .8)); }
+html[data-theme='light'] .tabbar a.on svg { color: rgb(var(--primary)); filter: none; }
+.vg-logo { width: 36px; height: 36px; perspective: 300px; flex: none; }
+.vg-logo i { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 12px; color: #ffffff; background: conic-gradient(from 210deg, #808080, #828282, #616161, #808080); box-shadow: 0 0 22px rgba(128,128,128, .65), inset 0 0 12px rgba(255,255,255, .3); animation: vg-sway 5s ease-in-out infinite; }
+@keyframes vg-sway { 0%, 100% { transform: rotateY(-26deg) rotateX(12deg); } 50% { transform: rotateY(26deg) rotateX(-12deg); } }
+
+/* ---------- появление ---------- */
+.vg-page { animation: vg-page .5s cubic-bezier(.2, .8, .2, 1) backwards; }
+.vg-stagger > * { animation: vg-rise .6s cubic-bezier(.2, .8, .2, 1) backwards; }
+.vg-stagger > *:nth-child(2) { animation-delay: 60ms; } .vg-stagger > *:nth-child(3) { animation-delay: 120ms; } .vg-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.vg-stagger > *:nth-child(5) { animation-delay: 240ms; } .vg-stagger > *:nth-child(6) { animation-delay: 300ms; } .vg-stagger > *:nth-child(7) { animation-delay: 360ms; } .vg-stagger > *:nth-child(n+8) { animation-delay: 420ms; }
+@keyframes vg-rise { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+@keyframes vg-page { from { opacity: 0; transform: translateY(12px); } }
+
+/* ===== Большая кнопка подключения ===== */
+.power-btn { position: relative; width: 100%; height: 76px; border-radius: 999px; color: #ffffff; font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: 17px; letter-spacing: .03em;
+  background: linear-gradient(110deg, #616161, #808080 35%, #858585 70%, #828282); background-size: 160% 100%; animation: vg-flow 6s ease-in-out infinite;
+  box-shadow: 0 0 0 1px rgba(255,255,255, .2) inset, 0 14px 44px -8px rgba(133,133,133, .85);
+  display: flex; align-items: center; justify-content: center; gap: 14px; overflow: hidden; transition: transform .15s ease, filter .2s; }
+.power-btn:active { transform: scale(.975); }
+.power-btn::before { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255, .35) 50%, transparent 70%); transform: translateX(-120%); animation: sheen 3.2s ease-in-out infinite; }
+.power-btn.busy::before { animation-duration: .8s; }
+.power-btn .pulse { position: absolute; inset: -2px; border-radius: 999px; box-shadow: 0 0 0 0 rgba(133,133,133, .6); animation: ring 2.2s ease-out infinite; pointer-events: none; }
+.power-btn:disabled { filter: saturate(.7) brightness(.9); }
+@keyframes vg-flow { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+@keyframes sheen { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(133,133,133, .55); } 100% { box-shadow: 0 0 0 26px rgba(133,133,133, 0); } }
+
+/* быстрые действия */
+.qa { flex: none; width: 92px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 6px 12px; border-radius: 22px; text-align: center;
+  background: linear-gradient(160deg, rgba(255,255,255, .07), rgba(255,255,255, .02)); border: 1px solid var(--glass-line, rgba(255,255,255,.08)); transition: transform .15s, border-color .2s, box-shadow .2s; position: relative; }
+.qa:hover { border-color: rgba(163,163,163, .4); box-shadow: 0 0 26px -8px rgba(128,128,128, .6); }
+.qa:active { transform: scale(.95); }
+.qa .ic { width: 46px; height: 46px; border-radius: 16px; display: grid; place-items: center; color: #ffffff; background: radial-gradient(circle at 30% 25%, #a3a3a3, #505050 75%); box-shadow: 0 0 22px rgba(128,128,128, .55); }
+.qa .ic.red { background: radial-gradient(circle at 30% 25%, #c5c5c5, #515151 75%); box-shadow: 0 0 22px rgba(130,130,130, .55); }
+.qa .ic.vio { background: radial-gradient(circle at 30% 25%, #c9c9c9, #545454 75%); box-shadow: 0 0 22px rgba(133,133,133, .55); }
+.qa .ic.grn { background: radial-gradient(circle at 30% 25%, #6ee7c8, #0a7a58 75%); box-shadow: 0 0 22px rgba(34, 211, 160, .5); }
+.qa span.l { font-size: 12px; font-weight: 700; line-height: 1.15; color: rgb(var(--text)); }
+.qa .dot { position: absolute; top: 9px; right: 12px; width: 11px; height: 11px; border-radius: 50%; background: #828282; box-shadow: 0 0 12px #828282; animation: blink 1.4s ease-in-out infinite; }
+html[data-theme='light'] .qa { background: rgb(var(--surface)); border-color: rgb(var(--border)); }
+@keyframes blink { 50% { opacity: .35; } }
+.hscroll { display: flex; gap: 10px; overflow-x: auto; padding: 4px 16px 10px; margin: 0 -16px; scrollbar-width: none; scroll-snap-type: x proximity; scroll-padding-inline: 16px; }
+.hscroll::-webkit-scrollbar { display: none; }
+.hscroll > * { scroll-snap-align: start; }
+@media (min-width: 768px) { .hscroll { margin: 0; padding: 4px 0 10px; flex-wrap: wrap; overflow: visible; } }
+
+/* CSS-монета для окна приза (без второго WebGL-контекста) */
+.css-coin { width: 120px; height: 120px; margin: 0 auto; perspective: 600px; }
+.css-coin i { display: block; width: 100%; height: 100%; border-radius: 50%; font-style: normal; display: grid; place-items: center; font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: 54px; color: #ffffff;
+  background: radial-gradient(circle at 30% 25%, #e0e0e0, #bcbcbc 55%, #6d6d6d 100%); box-shadow: 0 0 0 6px #d3d3d3 inset, 0 0 0 9px rgba(255,255,255, .25) inset, 0 0 50px rgba(195,195,195, .65); animation: coin 2.4s ease-in-out infinite; transform-style: preserve-3d; text-shadow: 0 2px 6px rgba(71,71,71, .7); }
+@keyframes coin { 0%, 100% { transform: rotateY(-28deg) rotateZ(-4deg); } 50% { transform: rotateY(28deg) rotateZ(4deg); } }
+
+/* резервное колесо без WebGL */
+.css-wheel { position: relative; width: min(78vw, 300px); aspect-ratio: 1; margin: 12px auto; border-radius: 50%; border: 8px solid #808080; box-shadow: 0 0 40px rgba(128,128,128, .6); transition: transform 4.6s cubic-bezier(.12, .7, .1, 1); }
+.css-wheel .lbl { position: absolute; left: 50%; top: 50%; transform-origin: 0 0; font-family: 'Unbounded', sans-serif; font-weight: 800; font-size: 13px; color: #ffffff; white-space: nowrap; text-shadow: 0 1px 4px rgba(0,0,0, .7); }
+
+@media (prefers-reduced-motion: reduce) {
+  .power-btn, .power-btn::before, .power-btn .pulse, .qa .dot, .css-coin i, .vg-logo i, .vg-page, .vg-stagger > * { animation: none !important; }
+  html.neon .tilt { transform: none !important; }
+}
