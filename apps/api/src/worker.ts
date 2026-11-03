@@ -85,6 +85,8 @@ export async function cleanup(): Promise<void> {
   await sql()`delete from bot_activity_updates where created_at < now() - interval '90 days'`;
   await sql()`delete from admin_daily_reports where created_at < now() - interval '90 days'`;
   await sql()`delete from auth_links where expires_at < now() - interval '1 hour'`;
+  // записи о звонках uCaller: срок указан в политике конфиденциальности
+  await sql()`delete from phone_verifications where created_at < now() - interval '30 days'`;
 }
 
 const JOBS: Record<string, () => Promise<unknown>> = {
