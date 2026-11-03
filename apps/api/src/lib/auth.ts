@@ -42,6 +42,8 @@ export async function requireUser(req: FastifyRequest, opts: { gate?: boolean } 
     const v = await verifyToken(t, 'user');
     if (!v) throw unauthorized('Сессия истекла, войдите заново');
     const [u] = await sql()<UserRow[]>`select * from users where id = ${v.sub}`;
+    // После сброса пароля старые сессии на других устройствах перестают действовать
+    if (u?.password_changed_at && (v.iat ?? 0) < Math.floor(u.password_changed_at.getTime() / 1000)) throw unauthorized('Сессия истекла, войдите заново');
     user = u;
   }
   if (!user) throw unauthorized();

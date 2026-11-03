@@ -73,6 +73,8 @@ beforeAll(async () => {
     if (u === '/contests/join') return { json: (state as any).join ?? { ok: true, contest: { title: 'Розыгрыш', prize: '7 дн. подписки', endsAt: new Date(Date.now() + 86400000).toISOString() } } };
     if (u === '/contests') return { json: [{ code: 'abc123', title: 'Розыгрыш', prize: '7 дн. подписки', endsAt: new Date(Date.now() + 86400000).toISOString(), entries: 5 }] };
     if (u === '/internal/tglink/confirm') return { json: { ok: true } };
+    if (u === '/internal/tglink/link-preview') return { json: (state as any).linkPreview ?? { phone: '+7900•••4567', alreadyLinked: false, balance: 12300, days: 40 } };
+    if (u === '/internal/tglink/link-confirm') return { json: { ok: true } };
     return { status: 404, json: { error: { message: 'nf' } } };
   });
   bot = createBot({ token: '1:T', apiUrl: core.url, internalKey: 'k', appUrl: 'https://app.example.test', apiRoot: tg.url, gateCacheMs: 0, botInfo: { id: 1, is_bot: true, first_name: 'B', username: 'test_bot', can_join_groups: true, can_read_all_group_messages: false, supports_inline_queries: false, can_connect_to_business: false, has_main_web_app: false } as any });
@@ -80,6 +82,29 @@ beforeAll(async () => {
 });
 afterAll(() => { tg.server.close(); core.server.close(); });
 beforeEach(() => { tgReply = null; tg.calls.length = 0; core.calls.length = 0; state = { me: me(), promoError: false, gate: { required: false, ok: true, text: '', chats: [] }, quests: { enabled: true, streak: 2, quests: [] } }; });
+
+describe('связка с аккаунтом сайта', () => {
+  const TOKEN = 'abcdefghijklmnopqrstuvwx';
+  it('показывает номер и последствия, ничего не объединяет без подтверждения', async () => {
+    await bot.handleUpdate(message(`/start link_${TOKEN}`) as any);
+    expect(lastText()).toContain('+7900•••4567');
+    expect(lastText()).toContain('Отменить это нельзя');
+    expect(buttons().map((x) => x.callback_data)).toEqual([`lk:${TOKEN}`, 'lk_no']);
+    expect(core.calls.some((c) => c.url.endsWith('/internal/tglink/link-confirm'))).toBe(false);
+  });
+  it('подтверждение объединяет один раз, отмена не трогает', async () => {
+    await bot.handleUpdate(callback('lk_no') as any);
+    expect(core.calls.some((c) => c.url.endsWith('/internal/tglink/link-confirm'))).toBe(false);
+    await bot.handleUpdate(callback(`lk:${TOKEN}`) as any);
+    expect(core.calls.filter((c) => c.url.endsWith('/internal/tglink/link-confirm')).map((c) => c.body)).toEqual([{ token: TOKEN }]);
+  });
+  it('уже связанный аккаунт: кнопки подтверждения нет', async () => {
+    (state as any).linkPreview = { phone: '+7900•••4567', alreadyLinked: true, balance: 0, days: 0 };
+    await bot.handleUpdate(message(`/start link_${TOKEN}`) as any);
+    expect(lastText()).toContain('уже связан');
+    expect(buttons()).toHaveLength(0);
+  });
+});
 
 describe('бот', () => {
   it('закрытие проекта: в меню таймер и «О закрытии», покупки скрыты', async () => {

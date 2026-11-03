@@ -126,22 +126,14 @@ export function createBot(o: BotOptions) {
     return lines.join('\n');
   }
 
-  async function showMenu(ctx: Context, edit = false) {
-    const [m, cfg] = await Promise.all([me(ctx), getConfig(ctx)]);
-    const text = `👋 <b>${esc(cfg.brandName)}</b> — быстрый и безопасный VPN.\n${cfg.welcomeText ? esc(cfg.welcomeText) + '\n' : ''}${cfg.maintenance ? '\n🛠 ' + esc(cfg.maintenanceText ?? 'Технические работы') + '\n' : ''}${closureLine(cfg) ? '\n' + closureLine(cfg) + '\n' : ''}\n${statusText(m)}`;
-    const kb = mainMenu(m, cfg);
-    if (edit && ctx.callbackQuery && !ctx.callbackQuery.message?.photo) await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb }));
-    else await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
-  }
-
-  /** Приветствие после /start: картинка + текст из админки + главное меню. Без текста — стандартное меню. */
+  /** Главный экран (/start, /menu, кнопка «Меню»): картинка + текст из админки + главное меню. Без текста — стандартное меню. */
   async function showStart(ctx: Context) {
     const [m, cfg] = await Promise.all([me(ctx), getConfig(ctx)]);
     const tpl = (cfg.startText ?? '').trim();
     const plain = (tpl || 'Добро пожаловать в {brand}, {name}!\n\nВаш интернет. Ваши правила.\nОткройте кабинет или подключите устройство.').replace(/\{brand\}/g, () => cfg.brandName).replace(/\{name\}/g, () => ctx.from?.first_name || 'друг');
     const text = esc(plain) + (closureLine(cfg) ? `\n\n${closureLine(cfg)}` : '') + (cfg.maintenance ? `\n\n🛠 ${esc(cfg.maintenanceText ?? 'Технические работы')}` : '') + (m.subscription.state !== 'none' ? `\n\n${statusText(m)}` : '');
     const kb = mainMenu(m, cfg);
-    const image = cfg.startImageUrl || `${o.appUrl.replace(/\/$/, '')}/orbit-bot.png`;
+    const image = cfg.startImageUrl || `${o.appUrl.replace(/\/$/, '')}/astat-bot.png`;
     try {
       // Не режем HTML-сущности; длинное приветствие отделяем от баннера.
       await ctx.replyWithPhoto(image, { caption: text.length <= 1000 ? text : esc(cfg.brandName), parse_mode: 'HTML', reply_markup: text.length <= 1000 ? kb : undefined });
@@ -189,9 +181,18 @@ export function createBot(o: BotOptions) {
     const [d, cfg] = await Promise.all([api.call<ServerStatusDTO>(ctx.from!, 'GET', '/status/servers'), getConfig(ctx)]);
     const kb = new InlineKeyboard().text('🔄 Обновить', 'status').row().text('⬅️ Меню', 'menu');
     const text = statusScreen(d, cfg.brandName);
-    // «Обновить» правит то же сообщение, чтобы не копить экраны в чате
-    if (edit && ctx.callbackQuery?.message) {
-      try { await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }); return; } catch (e) { if (String((e as Error).message).includes('not modified')) return; }
+    const image = `${o.appUrl.replace(/\/$/, '')}/astat-status.png`;
+    // Подпись к фото ограничена 1024 символами; длинный список и сбой загрузки фото показываем обычным текстом.
+    if (text.length <= 1000) {
+      try {
+        // «Обновить» и переход с экрана с фото правят то же сообщение, чтобы не копить экраны в чате
+        if (edit && ctx.callbackQuery?.message?.photo) await ctx.editMessageMedia({ type: 'photo', media: image, caption: text, parse_mode: 'HTML' }, { reply_markup: kb });
+        else await ctx.replyWithPhoto(image, { caption: text, parse_mode: 'HTML', reply_markup: kb });
+        return;
+      } catch (e) {
+        if (String((e as Error).message).includes('not modified')) return;
+        console.error('[bot] status photo failed:', (e as Error).message);
+      }
     }
     await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
   }
@@ -202,7 +203,17 @@ export function createBot(o: BotOptions) {
     for (const p of plans) kb.text(`${p.name} — ${formatRub(p.price)}${p.badge ? ' · ' + p.badge : ''}`, `plan:${p.id}`).row();
     kb.text('⬅️ Меню', 'menu');
     const lines = plans.map((p) => `• <b>${esc(p.name)}</b> (${durationLabel(p.durationDays)}) — ${formatRub(p.price)}${p.trafficLimitGb ? ', ' + p.trafficLimitGb + ' ГБ' : ', безлимит'}, ${p.deviceLimit ? `до ${p.deviceLimit} устр.` : 'безлимит устройств'}`);
-    await ctx.reply(`💳 <b>Выберите тариф</b>\n\n${lines.join('\n')}`, { parse_mode: 'HTML', reply_markup: kb });
+    const text = `💳 <b>Выберите тариф</b>\n\n${lines.join('\n')}`;
+    // Подпись к фото ограничена 1024 символами; длинный список и сбой загрузки фото показываем обычным текстом.
+    if (text.length <= 1000) {
+      try {
+        await ctx.replyWithPhoto(`${o.appUrl.replace(/\/$/, '')}/astat-buy-hands.png`, { caption: text, parse_mode: 'HTML', reply_markup: kb });
+        return;
+      } catch (e) {
+        console.error('[bot] plans photo failed:', (e as Error).message);
+      }
+    }
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
   }
 
   const payMethods = async (ctx: Context) => (await api.call<PaymentMethodDTO[]>(ctx.from!, 'GET', '/payment-methods')).filter((x) => x.provider !== 'balance');
@@ -684,7 +695,7 @@ export function createBot(o: BotOptions) {
         gateOk.set(ctx.from!.id, Date.now() + (o.gateCacheMs ?? 30_000));
         await ack(ctx, 'Готово!');
         const gift = pendingGifts.get(ctx.from.id);
-        if (gift && gift.exp>Date.now()) {pendingGifts.delete(ctx.from.id);await giftInvitation(ctx,gift.code);} else await showMenu(ctx);
+        if (gift && gift.exp>Date.now()) {pendingGifts.delete(ctx.from.id);await giftInvitation(ctx,gift.code);} else await showStart(ctx);
       } else await ack(ctx, 'Подписка не найдена. Подпишитесь и нажмите снова.', true);
     }),
   );
@@ -733,6 +744,17 @@ export function createBot(o: BotOptions) {
         await me(ctx);
         return joinFlow(ctx, payload.slice(2));
       }
+      if (payload.startsWith('link_')) {
+        const token = payload.slice(5);
+        if (!/^[A-Za-z0-9_-]{10,50}$/.test(token)) return void (await ctx.reply('Ссылка некорректна. Нажмите «Связать с Telegram» на сайте ещё раз.'));
+        const p = await api.call<{ phone: string; alreadyLinked: boolean; balance: number; days: number }>(ctx.from!, 'POST', '/internal/tglink/link-preview', { token });
+        if (p.alreadyLinked) return void (await ctx.reply('Этот Telegram или номер уже связан с другим аккаунтом.'));
+        await ctx.reply(
+          `🔗 <b>Связать Telegram с аккаунтом сайта?</b>\n\nНомер: <code>${esc(p.phone)}</code>\n\nАккаунты объединятся: баланс станет ${formatRub(p.balance)}, дни подписки сложатся (всего ${p.days}). Отменить это нельзя.\n\n⚠️ Подтверждайте, только если это ваш номер и вы сами нажали кнопку на сайте. Иначе нажмите «Отмена»: владелец номера получит доступ к вашему балансу и подписке.`,
+          { parse_mode: 'HTML', reply_markup: new InlineKeyboard().text('✅ Да, это мой номер', `lk:${token}`).row().text('Отмена', 'lk_no') },
+        );
+        return;
+      }
       if (payload.startsWith('auth_')) {
         const token = payload.slice(5);
         if (!/^[A-Za-z0-9_-]{10,64}$/.test(token)) return void (await ctx.reply('Ссылка для входа некорректна. Нажмите «Войти через Telegram» на сайте ещё раз.', { reply_markup: menuRow() }));
@@ -756,6 +778,14 @@ export function createBot(o: BotOptions) {
       await showStart(ctx);
     }),
   );
+  bot.callbackQuery(/^lk:(.+)$/, (ctx) =>
+    guard(ctx, async () => {
+      await ack(ctx);
+      await api.call(ctx.from!, 'POST', '/internal/tglink/link-confirm', { token: ctx.match[1]! });
+      await ctx.editMessageText('✅ <b>Аккаунты связаны.</b> Вернитесь на сайт: страница обновится сама. Теперь можно входить и через Telegram, и по номеру.', { parse_mode: 'HTML' }).catch(() => undefined);
+    }),
+  );
+  bot.callbackQuery('lk_no', (ctx) => guard(ctx, async () => { await ack(ctx); await ctx.editMessageText('Отменено. Аккаунты остались отдельными.').catch(() => undefined); }));
   async function confirmLogin(ctx: Context, token: string | undefined) {
     await ack(ctx);
     const done = (text: string) => ctx.editMessageText(text, { parse_mode: 'HTML' }).catch(() => ctx.reply(text, { parse_mode: 'HTML' }));
@@ -812,7 +842,7 @@ export function createBot(o: BotOptions) {
     await api.call<DevicesDTO>(ctx.from!, 'POST', '/devices/delete-all');
     await showDevices(ctx, true, '✅ Все устройства удалены.');
   }));
-  bot.command('menu', (ctx) => guard(ctx, () => showMenu(ctx)));
+  bot.command('menu', (ctx) => guard(ctx, () => showStart(ctx)));
   bot.command('status', (ctx) => guard(ctx, () => showServerStatus(ctx)));
   bot.callbackQuery('status', (ctx) => guard(ctx, async () => { await ack(ctx); await showServerStatus(ctx, true); }));
   bot.command('buy', (ctx) => guard(ctx, () => showPlans(ctx)));
@@ -833,7 +863,7 @@ export function createBot(o: BotOptions) {
     await ctx.reply(cfg.supportUrl && !/^https?:\/\//.test(cfg.supportUrl) ? `💬 Поддержка: ${esc(cfg.supportUrl)}` : '💬 Мы на связи — напишите нам:', { parse_mode: 'HTML', reply_markup: kb });
   }
 
-  bot.callbackQuery('menu', (ctx) => guard(ctx, async () => { pendingBc.delete(ctx.from.id); await ack(ctx); await showMenu(ctx, true); }));
+  bot.callbackQuery('menu', (ctx) => guard(ctx, async () => { pendingBc.delete(ctx.from.id); await ack(ctx); await showStart(ctx); }));
   bot.callbackQuery('connect', (ctx) => guard(ctx, async () => { await ack(ctx); await showConnect(ctx); }));
   bot.callbackQuery('plans', (ctx) => guard(ctx, async () => { await ack(ctx); await showPlans(ctx); }));
   bot.callbackQuery('ref', (ctx) => guard(ctx, async () => { await ack(ctx); await showRef(ctx); }));
@@ -1026,7 +1056,7 @@ export function createBot(o: BotOptions) {
         }
         return;
       }
-      await showMenu(ctx);
+      await showStart(ctx);
     }),
   );
 

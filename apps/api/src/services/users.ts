@@ -4,7 +4,7 @@ import { sql, type Sql, type TxSql } from '../db/index.js';
 import type { UserRow } from '../db/types.js';
 import { randomCode } from '../lib/crypto.js';
 import type { TgUser } from '../lib/telegram.js';
-import { notFound } from '../lib/errors.js';
+import { conflict, notFound } from '../lib/errors.js';
 import { getSettings } from './settings.js';
 import { getSubscriptionDTO } from './subscriptions.js';
 import { giveSignupBonuses } from './referrals.js';
@@ -80,4 +80,34 @@ export async function toMe(u: UserRow): Promise<MeDTO> {
     trialAvailable: trial.enabled && !u.trial_used && !trialState.has_sub && !trialState.blocked,
     subscription: await getSubscriptionDTO(u),
   };
+}
+
+/** Новый пользователь сайта без Telegram: номер уже подтверждён звонком. */
+export async function createPhoneUser(phone: string, passwordHash: string, refCode?: string | null): Promise<UserRow> {
+  const db = sql();
+  let referrerId: string | null = null;
+  let partnerId: string | null = null;
+  if (refCode) {
+    const [r] = await db`select id from users where referral_code = ${refCode.toLowerCase()}`;
+    referrerId = r?.id ?? null;
+    if (!referrerId) {
+      const [pl] = await db`select id, owner_user_id from partner_links where code = ${refCode.toLowerCase()} and is_active`;
+      if (pl) { partnerId = pl.id; referrerId = pl.owner_user_id ?? null; }
+    }
+  }
+  for (let i = 0; i < 5; i++) {
+    try {
+      const [u] = await db<UserRow[]>`
+        insert into users (phone, password_hash, lang, referral_code, referrer_id, partner_link_id)
+        values (${phone}, ${passwordHash}, 'ru', ${randomCode(8)}, ${referrerId}, ${partnerId}) returning *`;
+      if (u!.referrer_id) await giveSignupBonuses(u!).catch(() => {});
+      return u!;
+    } catch (e: any) {
+      const constraint = String(e?.constraint_name);
+      if (e?.code === '23505' && constraint.includes('referral_code')) continue;
+      if (e?.code === '23505' && constraint.includes('phone')) throw conflict('Этот номер уже зарегистрирован. Войдите или восстановите пароль.', 'phone_taken');
+      throw e;
+    }
+  }
+  throw new Error('Не удалось сгенерировать реферальный код');
 }

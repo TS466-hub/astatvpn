@@ -41,6 +41,8 @@ import { probeTargets, recordClientProbes, recordServerProbes } from '../service
 import { countryFromName, pointByCode, resolveGeo } from '../lib/geo.js';
 import { getSettings } from '../services/settings.js';
 import { getSubscriptionDTO, resetSubscriptionLink, startTrial } from '../services/subscriptions.js';
+import { mergeTelegramLink, previewTelegramLink, startTelegramLink } from '../services/accountLink.js';
+import { completeRegistration, completeReset, loginWithPassword, startVerification } from '../services/phoneAuth.js';
 import { toMe, upsertTelegramUser } from '../services/users.js';
 import type { AdminRole, NodeDTO, PaymentDTO } from '@vpn/shared';
 
@@ -129,6 +131,7 @@ export async function publicRoutes(app: FastifyInstance) {
       contestsActive: await hasActiveContests(),
       closure: await publicClosure(),
       gateEnabled: gate.enabled && gate.chats.length > 0,
+      phoneAuthEnabled: (await getSettings('phone_auth')).enabled,
       appearance: { accent: ap.accent, logoUrl: ap.logo_url, banner: ap.banner_text, design: ap.miniapp_design },
     };
   });
@@ -146,6 +149,29 @@ export async function publicRoutes(app: FastifyInstance) {
     }
     const ref = r.startParam?.startsWith('ref_') ? r.startParam.slice(4) : null;
     const user = await upsertTelegramUser(r.user, ref);
+    return { accessToken: await signUserToken(user.id) };
+  });
+
+  // Вход на сайт по номеру: работает там, где Telegram недоступен
+  const newPassword = z.string().min(8, 'Пароль должен быть не короче 8 символов').max(128);
+  const callCode = z.string().regex(/^\d{4}$/, 'Введите 4 цифры');
+  app.post('/auth/phone/start', { config: { rateLimit: { max: 6, timeWindow: '1 minute' } } }, async (req) => {
+    const b = z.object({ phone: z.string().min(5).max(32), purpose: z.enum(['register', 'reset']) }).parse(req.body);
+    return startVerification(b.phone, b.purpose, req.ip);
+  });
+  app.post('/auth/phone/register', { config: { rateLimit: { max: 15, timeWindow: '1 minute' } } }, async (req) => {
+    const b = z.object({ id: z.string().uuid(), code: callCode, password: newPassword, ref: z.string().max(32).optional() }).parse(req.body);
+    const user = await completeRegistration(b.id, b.code, b.password, b.ref);
+    return { accessToken: await signUserToken(user.id) };
+  });
+  app.post('/auth/phone/reset', { config: { rateLimit: { max: 15, timeWindow: '1 minute' } } }, async (req) => {
+    const b = z.object({ id: z.string().uuid(), code: callCode, password: newPassword }).parse(req.body);
+    const user = await completeReset(b.id, b.code, b.password);
+    return { accessToken: await signUserToken(user.id) };
+  });
+  app.post('/auth/phone/login', { config: { rateLimit: { max: 15, timeWindow: '1 minute' } } }, async (req) => {
+    const b = z.object({ phone: z.string().min(5).max(32), password: z.string().min(1).max(128) }).parse(req.body);
+    const user = await loginWithPassword(b.phone, b.password);
     return { accessToken: await signUserToken(user.id) };
   });
 
@@ -171,12 +197,27 @@ export async function publicRoutes(app: FastifyInstance) {
   app.post('/internal/tglink/confirm', async (req) => {
     if (!isInternal(req)) throw unauthorized();
     const { token } = z.object({ token: z.string().min(10).max(64) }).parse(req.body);
-    const [l] = await sql()`select * from auth_links where token = ${token} and expires_at > now() and user_id is null`;
+    const [l] = await sql()`select * from auth_links where token = ${token} and expires_at > now() and user_id is null and link_user_id is null`;
     if (!l) throw notFound('Ссылка для входа устарела');
     // пользователя создаём/находим по заголовкам x-tg-user; реф-код берём из ссылки
     req.headers['x-ref-code'] = l.ref_code ?? '';
     const user = await requireUser(req, { gate: false });
     await sql()`update auth_links set user_id = ${user.id} where token = ${token}`;
+    return { ok: true };
+  });
+
+  // Связка аккаунта сайта с Telegram: сайт просит ссылку, человек подтверждает объединение в боте, сайт забирает новый токен через /auth/tglink/:token
+  app.post('/me/telegram-link', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req) => startTelegramLink(await requireUser(req, { gate: false })));
+  app.post('/internal/tglink/link-preview', async (req) => {
+    if (!isInternal(req)) throw unauthorized();
+    const { token } = z.object({ token: z.string().min(10).max(64) }).parse(req.body);
+    return previewTelegramLink(token, await requireUser(req, { gate: false }));
+  });
+  app.post('/internal/tglink/link-confirm', async (req) => {
+    if (!isInternal(req)) throw unauthorized();
+    const { token } = z.object({ token: z.string().min(10).max(64) }).parse(req.body);
+    const user = await requireUser(req, { gate: false });
+    await mergeTelegramLink(token, user.id);
     return { ok: true };
   });
 

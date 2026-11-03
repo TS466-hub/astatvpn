@@ -247,6 +247,8 @@ export interface AppConfigDTO {
   /** проект закрывается: таймер, продажи и регистрация закрыты */
   closure?: { active: false } | { active: true; endsAt: string | null; serverNow: string; reason: string; altText: string; altUrl: string };
   gateEnabled: boolean;
+  /** вход и регистрация на сайте по номеру телефона */
+  phoneAuthEnabled: boolean;
   appearance: { accent: string; logoUrl: string; banner: string; design?: import('./designs.js').MiniAppDesignId };
 }
 

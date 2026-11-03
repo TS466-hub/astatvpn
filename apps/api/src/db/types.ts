@@ -3,6 +3,11 @@ export interface UserRow {
   tg_id: number | null;
   username: string | null;
   first_name: string | null;
+  phone: string | null;
+  password_hash: string | null;
+  password_changed_at: Date | null;
+  login_failed: number;
+  login_locked_until: Date | null;
   lang: string;
   email: string | null;
   referral_code: string;

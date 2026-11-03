@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LAND } from '../three/land';
 
 const RAMP = ' .:-=+*#%@';
@@ -65,84 +65,79 @@ function AsciiCanvas({ cols, paint, animate = true, fps = 18, label }: { cols: n
   return <canvas ref={ref} className="ascii-canvas" role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : true} />;
 }
 
-/* Руки строятся из «конечностей» — цепочек кругов с плавно меняющимся радиусом. Пространство 1000×500. */
-type Limb = [number, number, number][];
-const LEFT_HAND: Limb[] = [
-  [[-80, 70, 60], [120, 112, 62], [250, 176, 60]],
-  [[250, 176, 60], [352, 226, 58]],
-  [[262, 214, 24], [318, 262, 20], [352, 312, 16]],
-  [[300, 262, 22], [304, 322, 19], [284, 366, 14]],
-  [[344, 272, 25], [360, 338, 21], [344, 396, 15]],
-  [[384, 254, 27], [418, 326, 22], [414, 388, 16]],
-  [[396, 216, 28], [452, 262, 21], [494, 308, 14]],
-];
-const RIGHT_HAND: Limb[] = [
-  [[1080, 196, 62], [900, 262, 60], [800, 312, 60]],
-  [[800, 312, 60], [738, 318, 54]],
-  [[826, 368, 22], [820, 424, 19], [832, 468, 14]],
-  [[778, 370, 25], [760, 430, 21], [768, 482, 15]],
-  [[728, 352, 25], [704, 404, 20], [692, 444, 14]],
-  [[782, 262, 24], [722, 248, 19], [680, 268, 15]],
-  [[724, 296, 28], [650, 286, 21], [586, 292, 14]],
-];
-const TIP_A = [506, 310] as const;
-const TIP_B = [574, 292] as const;
+/* Руки берутся из маски /hands-mask.png, вырезанной из исходной ASCII-картинки. Координаты маски — 2000×820. */
+const TIP_A = [905, 442] as const;
+const TIP_B = [1160, 405] as const;
+const PULSE_SECONDS = 4.2;
+const REVEAL_SECONDS = 1.8;
 
-function drawLimb(ctx: CanvasRenderingContext2D, limb: Limb) {
-  const pass = (grow: number, tone: string, lift: number) => {
-    ctx.fillStyle = tone;
-    for (let s = 0; s < limb.length - 1; s++) {
-      const [ax, ay, ar] = limb[s]!, [bx, by, br] = limb[s + 1]!;
-      const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 3);
-      for (let i = 0; i <= steps; i++) {
-        const k = i / steps, rad = (ar + (br - ar) * k) * grow;
-        ctx.beginPath();
-        ctx.arc(ax + (bx - ax) * k, ay + (by - ay) * k - lift * (ar + (br - ar) * k), Math.max(rad, 0), 0, 7);
-        ctx.fill();
+function handsPainter(source: HTMLImageElement): Painter {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let cache: { key: string; mask: Float32Array } | null = null;
+  let start: number | null = null;
+  return (buf, cols, rows, t) => {
+    const key = `${cols}x${rows}`;
+    if (cache?.key !== key) {
+      const c = document.createElement('canvas');
+      c.width = cols; c.height = rows;
+      const ctx = c.getContext('2d', { willReadFrequently: true })!;
+      ctx.drawImage(source, 0, 0, cols, rows);
+      const px = ctx.getImageData(0, 0, cols, rows).data;
+      const mask = new Float32Array(cols * rows);
+      for (let i = 0; i < mask.length; i++) mask[i] = Math.min(1, px[i * 4]! / 255 * 2.4);
+      cache = { key, mask };
+    }
+    const { mask } = cache;
+    start ??= t;
+    const age = reduced ? 1e3 : t - start;
+    const ax = TIP_A[0] * cols / 2000, ay = TIP_A[1] * rows / 820, bx = TIP_B[0] * cols / 2000, by = TIP_B[1] * rows / 820;
+    const gapX = (ax + bx) / 2, gapY = (ay + by) / 2;
+    const reveal = 1 - (1 - Math.min(1, age / REVEAL_SECONDS)) ** 3;
+    // Цикл: сигнал перелетает от пальца к пальцу (первые 30%), затем волна расходится по обеим рукам.
+    const phase = age < REVEAL_SECONDS ? -1 : ((age - REVEAL_SECONDS) % PULSE_SECONDS) / PULSE_SECONDS;
+    const flight = phase >= 0 && phase < 0.3 ? phase / 0.3 : -1;
+    const waveAt = phase >= 0.3 ? (phase - 0.3) / 0.7 : -1;
+    const waveR = waveAt * Math.max(cols, rows / CHAR_ASPECT) * 0.6;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      const m = mask[i]!;
+      const dx = c - gapX, dy = (r - gapY) / CHAR_ASPECT, dist = Math.hypot(dx, dy);
+      let v = 0;
+      if (m > 0.06) {
+        // Появление: рисунок проступает от краёв экрана к пальцам, граница неровная, как у помех.
+        const edge = Math.abs(dx) / (cols / 2) + 0.06 * Math.sin(r * 1.7 + c * 0.3);
+        if (edge > 1 - reveal * 1.15) {
+          const shimmer = reduced ? 0 : 0.07 * Math.sin(c * 0.9 + r * 1.3 + t * 1.6);
+          const wave = waveAt >= 0 ? 0.5 * (1 - waveAt) * Math.exp(-(((dist - waveR) / 5) ** 2)) : 0;
+          v = m + shimmer + wave;
+        }
       }
+      if (flight >= 0) {
+        for (let k = 0; k < 5; k++) { // голова сигнала и затухающий хвост
+          const p = flight - k * 0.045;
+          if (p < 0) break;
+          const px = ax + (bx - ax) * p, py = ay + (by - ay) * p;
+          const g = Math.exp(-(((c - px) ** 2) + ((r - py) / CHAR_ASPECT) ** 2) / 1.6) * (1 - k * 0.18);
+          if (g > v) v = g;
+        }
+      }
+      buf[i] = v;
     }
   };
-  pass(1.1, '#000', 0);      // тёмная кромка отделяет пальцы друг от друга
-  pass(1, '#6a6a6a', 0);     // тень
-  pass(0.72, '#9a9a9a', 0.14); // основной объём
-  pass(0.36, '#d0d0d0', 0.34); // блик
 }
-
-function handsMask(cols: number, rows: number) {
-  const c = document.createElement('canvas');
-  c.width = cols; c.height = rows;
-  const ctx = c.getContext('2d', { willReadFrequently: true })!;
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cols, rows);
-  ctx.scale(cols / 1000, rows / 500);
-  [...LEFT_HAND, ...RIGHT_HAND].forEach((l) => drawLimb(ctx, l));
-  const px = ctx.getImageData(0, 0, cols, rows).data;
-  const mask = new Float32Array(cols * rows);
-  for (let i = 0; i < mask.length; i++) mask[i] = px[i * 4]! / 255;
-  return mask;
-}
-
-let handsCache: { key: string; mask: Float32Array } | null = null;
-const paintHands: Painter = (buf, cols, rows, t) => {
-  const key = `${cols}x${rows}`;
-  if (handsCache?.key !== key) handsCache = { key, mask: handsMask(cols, rows) };
-  const { mask } = handsCache;
-  const ax = TIP_A[0] * cols / 1000, ay = TIP_A[1] * rows / 500, bx = TIP_B[0] * cols / 1000, by = TIP_B[1] * rows / 500;
-  const pulse = (t * 0.5) % 1; // сигнал бежит от пальца к пальцу и волной уходит по руке
-  const px = ax + (bx - ax) * pulse, py = ay + (by - ay) * pulse;
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    const i = r * cols + c;
-    const m = mask[i]!;
-    const dist = Math.hypot(c - (ax + bx) / 2, (r - (ay + by) / 2) / CHAR_ASPECT);
-    const wave = m > 0 ? 0.16 * Math.max(0, Math.sin(dist * 0.16 - t * 2.4)) ** 6 : 0;
-    const spark = Math.exp(-(((c - px) ** 2) + ((r - py) / CHAR_ASPECT) ** 2) / 2.2);
-    buf[i] = Math.max(m > 0.05 ? m + wave : 0, spark);
-  }
-};
 
 export function AsciiHands() {
-  // на телефоне символы крупнее, иначе рисунок превращается в серую заливку
-  const cols = matchMedia('(max-width: 760px)').matches ? 110 : 210;
-  return <div className="ascii-hands"><AsciiCanvas cols={cols} paint={paintHands} label="Две руки из символов тянутся друг к другу" /></div>;
+  // На телефоне символы крупнее, иначе рисунок превращается в серую заливку
+  const cols = matchMedia('(max-width: 760px)').matches ? 120 : 240;
+  const [paint, setPaint] = useState<Painter | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const img = new Image();
+    img.onload = () => { if (alive) setPaint(() => handsPainter(img)); };
+    img.src = '/hands-mask.png';
+    return () => { alive = false; };
+  }, []);
+  return <div className="ascii-hands">{paint && <AsciiCanvas cols={cols} paint={paint} fps={24} label="Две руки из символов тянутся друг к другу, между пальцами пробегает сигнал" />}</div>;
 }
 
 const POINTS = LAND.map(([lat, lon]) => {

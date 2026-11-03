@@ -219,6 +219,22 @@ export async function setBanned(userId: string, banned: boolean): Promise<void> 
 
 const liveCache = new Map<string, { at: number; used: number }>();
 
+/** После объединения аккаунтов: панель должна знать новый срок, лимиты и Telegram владельца. */
+export async function pushMergedAccess(tx: TxSql, user: UserRow): Promise<void> {
+  if (!user.rw_id) return;
+  const [sub] = await tx<SubscriptionRow[]>`select * from subscriptions where user_id = ${user.id}`;
+  if (!sub) return void (await remnawave.updateUser(user.rw_id, { telegramId: user.tg_id }));
+  const active = sub.expires_at.getTime() > Date.now();
+  await remnawave.updateUser(user.rw_id, {
+    telegramId: user.tg_id,
+    expireAt: sub.expires_at,
+    trafficLimitBytes: lteEnabled() ? 0 : Number(sub.traffic_limit_bytes),
+    hwidDeviceLimit: sub.device_limit,
+    ...(active ? { status: 'ACTIVE' as const } : {}),
+    activeInternalSquads: await squadsFor(tx, user.id, active),
+  });
+}
+
 export async function getSubscriptionRow(userId: string, db: Sql | TxSql = sql()): Promise<SubscriptionRow | null> {
   const [s] = await db<SubscriptionRow[]>`select * from subscriptions where user_id = ${userId}`;
   return s ?? null;

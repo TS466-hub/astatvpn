@@ -21,11 +21,11 @@ export async function signAdminToken(adminId: string, role: string, opts: { reme
     .sign(key());
 }
 
-export async function verifyToken(token: string, typ: 'user' | 'admin'): Promise<{ sub: string; role?: string; rem?: boolean; ep?: number; exp?: number } | null> {
+export async function verifyToken(token: string, typ: 'user' | 'admin'): Promise<{ sub: string; iat?: number; role?: string; rem?: boolean; ep?: number; exp?: number } | null> {
   try {
     const { payload } = await jwtVerify(token, key(), { algorithms: ['HS256'] });
     if (payload.typ !== typ || !payload.sub) return null;
-    return { sub: payload.sub, role: payload.role as string | undefined, rem: payload.rem === true, ep: typeof payload.ep === 'number' ? payload.ep : 0, exp: payload.exp };
+    return { sub: payload.sub, role: payload.role as string | undefined, iat: payload.iat, rem: payload.rem === true, ep: typeof payload.ep === 'number' ? payload.ep : 0, exp: payload.exp };
   } catch {
     return null;
   }

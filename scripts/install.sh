@@ -287,14 +287,14 @@ install_cleanup_cron() {
     bash "$INSTALL_DIR/scripts/cleanup.sh" --install --dir "$INSTALL_DIR"
     ok "Ежедневная очистка кэшей в 04:15 включена (systemd timer)"
   elif command -v crontab >/dev/null 2>&1; then
-    ( crontab -l 2>/dev/null | grep -v 'vpn-platform-cleanup' ; echo "15 4 * * * bash '$INSTALL_DIR/scripts/cleanup.sh' --dir '$INSTALL_DIR' >/dev/null 2>&1 # vpn-platform-cleanup" ) | crontab -
+    ( { crontab -l 2>/dev/null | grep -v 'vpn-platform-cleanup' || true; } ; echo "15 4 * * * bash '$INSTALL_DIR/scripts/cleanup.sh' --dir '$INSTALL_DIR' >/dev/null 2>&1 # vpn-platform-cleanup" ) | crontab -
     ok "Ежедневная очистка кэшей в 04:15 включена (cron)"
   fi
 }
 
 install_backup_cron() {
   command -v crontab >/dev/null 2>&1 || return 0
-  ( crontab -l 2>/dev/null | grep -v 'vpn-platform-backup' ; echo "30 3 * * * bash '$INSTALL_DIR/scripts/backup.sh' >'$INSTALL_DIR/backups/last-backup.log' 2>&1 # vpn-platform-backup" ) | crontab -
+  ( { crontab -l 2>/dev/null | grep -v 'vpn-platform-backup' || true; } ; echo "30 3 * * * bash '$INSTALL_DIR/scripts/backup.sh' >'$INSTALL_DIR/backups/last-backup.log' 2>&1 # vpn-platform-backup" ) | crontab -
   ok "Ежедневный бэкап в 03:30 (папка $INSTALL_DIR/backups, журнал последнего запуска: backups/last-backup.log)"
 }
 
@@ -542,7 +542,8 @@ ENV
 ok "Файл настроек создан: $ENV_FILE"
 
 info "Собираю образы и запускаю (первая сборка занимает 3–8 минут)"
-compose up -d --build || { compose logs --tail 60 || true; die "Не удалось запустить контейнеры. Логи выше."; }
+compose build || die "Сборка образов не удалась. Ошибки выше."
+compose up -d || { compose logs --tail 60 || true; die "Не удалось запустить контейнеры. Логи выше."; }
 
 info "Жду готовности API"
 ready=0

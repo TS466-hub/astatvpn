@@ -60,6 +60,8 @@ services:
 
   worker:
     <<: *api-env
+    # тот же образ, что у api; build нужен, иначе новые версии Compose пытаются скачать его из Docker Hub
+    build: { context: .., dockerfile: deploy/Dockerfile, target: api }
     image: vpn-api:local
     container_name: vpn-worker
     logging: *logging

@@ -34,7 +34,7 @@ async function setup() {
     { command: 'wheel', description: 'Колесо удачи' },
     { command: 'support', description: 'Поддержка' },
   ]);
-  if (appUrl.startsWith('https://')) await bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'Открыть', web_app: { url: appUrl } } });
+  await bot.api.setChatMenuButton({ menu_button: { type: 'commands' } });
 }
 
 async function main() {

@@ -12,7 +12,7 @@ export function Toggle({ label, hint, checked, onChange }: { label: string; hint
 }
 
 /** Форма одной группы настроек с сохранением и кнопкой «Проверить» */
-export function GroupForm({ group, data, title, description, right, children, testTarget, testLabel, locked, invalid }: { group: string; data: any; title: string; description?: string; right?: ReactNode; children: (v: any, set: (k: string, val: unknown) => void) => ReactNode; testTarget?: 'yookassa' | 'platega' | 'rollypay' | 'remnawave'; testLabel?: string; locked?: boolean; invalid?: (v: any) => boolean }) {
+export function GroupForm({ group, data, title, description, right, children, testTarget, testLabel, locked, invalid }: { group: string; data: any; title: string; description?: string; right?: ReactNode; children: (v: any, set: (k: string, val: unknown) => void) => ReactNode; testTarget?: 'yookassa' | 'platega' | 'rollypay' | 'remnawave' | 'ucaller'; testLabel?: string; locked?: boolean; invalid?: (v: any) => boolean }) {
   const toast = useToast();
   const qc = useQueryClient();
   const [v, setV] = useState<any>(data);
@@ -26,11 +26,11 @@ export function GroupForm({ group, data, title, description, right, children, te
     onError: (e) => toast(errMsg(e), 'error'),
   });
   const test = useMutation({
-    mutationFn: () => post<{ ok: boolean; error?: string; version?: string; squadName?: string; squadUuid?: string }>(`/settings/test/${testTarget}`),
+    mutationFn: () => post<{ ok: boolean; error?: string; balance?: number | null; version?: string; squadName?: string; squadUuid?: string }>(`/settings/test/${testTarget}`),
     onSuccess: (r) => setTestRes({
       ok: r.ok,
       text: r.ok
-        ? 'Подключение работает' + (r.version ? ` (Remnawave ${r.version})` : '') + (r.squadName ? `. Группа для новых пользователей: «${r.squadName}»` : '')
+        ? 'Подключение работает' + (typeof r.balance === 'number' ? `. Баланс uCaller: ${r.balance} ₽` : '') + (r.version ? ` (Remnawave ${r.version})` : '') + (r.squadName ? `. Группа для новых пользователей: «${r.squadName}»` : '')
         // панель ответила, но есть проблема с группой (сквадом) — показываем её отдельно от «нет связи»
         : (r.version || r.squadUuid ? 'Панель отвечает, но есть проблема: ' : '') + (r.error ?? 'Не удалось подключиться'),
     }),

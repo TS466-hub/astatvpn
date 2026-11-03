@@ -1,3 +1,4 @@
+import { ucaller } from '../../services/ucaller.js';
 import { appNoticeDraft, appNoticeSchema } from '../../services/appNotices.js';
 import { recentOutages, statusView, syncStatusServers } from '../../services/serverStatus.js';
 import { OPERATOR_LABEL, activeNetIssues, lastServerProbes, netStatus } from '../../services/netprobe.js';
@@ -213,7 +214,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const db = sql();
     const search = q.q?.trim();
     const where = db`
-      ${search ? db`(u.username ilike ${'%' + search + '%'} or u.first_name ilike ${'%' + search + '%'} or u.email ilike ${'%' + search + '%'} or u.tg_id::text = ${search} or u.id::text = ${search})` : db`true`}
+      ${search ? db`(u.username ilike ${'%' + search + '%'} or u.first_name ilike ${'%' + search + '%'} or u.email ilike ${'%' + search + '%'} or u.phone ilike ${'%' + search.replace(/\D/g, '') + '%'} and ${search.replace(/\D/g, '').length >= 4} or u.tg_id::text = ${search} or u.id::text = ${search})` : db`true`}
       and ${
         q.filter === 'active' ? db`s.expires_at > now() and not s.is_trial`
         : q.filter === 'trial' ? db`s.expires_at > now() and s.is_trial`
@@ -239,7 +240,8 @@ export async function adminRoutes(app: FastifyInstance) {
     const payments = await sql()`select id, provider, purpose, amount, status, plan_name, created_at, paid_at, fulfilled_at, fulfill_error from payments where user_id = ${id} order by created_at desc limit 30`;
     const tx = await sql()`select type, amount, balance_after, note, created_at from transactions where user_id = ${id} order by created_at desc limit 30`;
     const [ref] = await sql()`select count(*)::int as invited from users where referrer_id = ${id}`;
-    return { user: u, subscription: await getSubscriptionDTO(u, { live: true }), payments, transactions: tx, invited: ref!.invited };
+    const { password_hash: _hash, ...safeUser } = u;
+    return { user: safeUser, subscription: await getSubscriptionDTO(u, { live: true }), payments, transactions: tx, invited: ref!.invited };
   });
 
   app.post('/users/:id/extend', async (req) => {
@@ -551,11 +553,12 @@ export async function adminRoutes(app: FastifyInstance) {
 
   app.post('/settings/test/:target', async (req) => {
     await requireAdmin(req, 'owner');
-    const { target } = z.object({ target: z.enum(['yookassa', 'platega', 'rollypay', 'remnawave']) }).parse(req.params);
+    const { target } = z.object({ target: z.enum(['yookassa', 'platega', 'rollypay', 'remnawave', 'ucaller']) }).parse(req.params);
     try {
       if (target === 'yookassa') await yookassa.ping();
       else if (target === 'platega') await platega.ping();
       else if (target === 'rollypay') await rollypay.ping();
+      else if (target === 'ucaller') return { ok: true, ...(await ucaller.ping()) };
       else {
         const p = await remnawave.ping();
         // панель отвечает, но основной сквад не настроен/не найден — понятная проблема по-русски

@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth';
 import { fmtDateTime } from '../lib/format';
 import { isUuid } from '@vpn/shared';
 
-type Tab = 'payments' | 'remnawave' | 'general' | 'growth' | MoreTab | 'security' | 'admins';
+type Tab = 'payments' | 'remnawave' | 'phone' | 'general' | 'growth' | MoreTab | 'security' | 'admins';
 interface SettingsResp { settings: Record<string, any>; webhooks: { yookassa: string; platega: string; rollypay: string }; env: { remnawaveFromEnv: boolean; botUsername: string; botConfigured: boolean }; mask: string }
 
 const ROLLY_METHODS = [
@@ -213,6 +213,28 @@ function RemnawaveTab({ s, locked }: { s: SettingsResp; locked: boolean }) {
   );
 }
 
+function PhoneAuth({ s, locked }: { s: SettingsResp; locked: boolean }) {
+  const num = (x: string, fallback: number) => (x === '' ? fallback : Math.max(0, parseInt(x, 10) || 0));
+  return (
+    <GroupForm group="phone_auth" data={s.settings.phone_auth} locked={locked} title="Вход и регистрация по номеру" description="Сайт подтверждает номер звонком через uCaller: последние 4 цифры входящего номера и есть код. Работает там, где Telegram недоступен." testTarget="ucaller" testLabel="Проверить подключение">
+      {(v, set) => (<>
+        <Toggle label="Разрешить вход по номеру" hint="Если выключить, на сайте останется только вход через Telegram" checked={v.enabled} onChange={(x: boolean) => set('enabled', x)} />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="ID сервиса" hint="uCaller → Мои сервисы"><Input value={v.service_id} onChange={(e) => set('service_id', e.target.value.trim())} /></Field>
+          <Field label="Секретный ключ" hint="Хранится в зашифрованном виде"><Input type="password" value={v.key} onChange={(e) => set('key', e.target.value.trim())} /></Field>
+        </div>
+        <div className="text-sm font-semibold">Защита баланса</div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Пауза между звонками, сек"><Input type="number" min={15} max={3600} value={v.cooldown_sec} onChange={(e) => set('cooldown_sec', num(e.target.value, 60))} /></Field>
+          <Field label="Звонков на номер в сутки" hint="uCaller разрешает не больше 30"><Input type="number" min={1} max={30} value={v.max_per_phone_day} onChange={(e) => set('max_per_phone_day', num(e.target.value, 5))} /></Field>
+          <Field label="Звонков с одного IP в сутки"><Input type="number" min={1} max={1000} value={v.max_per_ip_day} onChange={(e) => set('max_per_ip_day', num(e.target.value, 10))} /></Field>
+          <Field label="Всего звонков в сутки" hint="При достижении лимита придёт уведомление, новые звонки приостановятся"><Input type="number" min={1} max={100000} value={v.max_per_day} onChange={(e) => set('max_per_day', num(e.target.value, 300))} /></Field>
+        </div>
+      </>)}
+    </GroupForm>
+  );
+}
+
 function General({ s, locked }: { s: SettingsResp; locked: boolean }) {
   return (
     <GroupForm group="general" data={s.settings.general} locked={locked} title="Основное">
@@ -365,7 +387,7 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('payments');
   const q = useQuery({ queryKey: ['settings'], queryFn: () => get<SettingsResp>('/settings') });
   const items: { value: Tab; label: string }[] = [
-    { value: 'payments', label: 'Платежи' }, { value: 'remnawave', label: 'Remnawave' }, { value: 'general', label: 'Основное' }, { value: 'growth', label: 'Пробный и рефералы' }, { value: 'gate', label: 'Подписка на канал' }, { value: 'topup', label: 'Пополнение' }, { value: 'features', label: 'Докупки и квесты' }, { value: 'notifications', label: 'Уведомления' }, { value: 'monitoring', label: 'Мониторинг' }, { value: 'appearance', label: 'Оформление' }, { value: 'security', label: 'Безопасность' },
+    { value: 'payments', label: 'Платежи' }, { value: 'remnawave', label: 'Remnawave' }, { value: 'phone', label: 'Вход по номеру' }, { value: 'general', label: 'Основное' }, { value: 'growth', label: 'Пробный и рефералы' }, { value: 'gate', label: 'Подписка на канал' }, { value: 'topup', label: 'Пополнение' }, { value: 'features', label: 'Докупки и квесты' }, { value: 'notifications', label: 'Уведомления' }, { value: 'monitoring', label: 'Мониторинг' }, { value: 'appearance', label: 'Оформление' }, { value: 'security', label: 'Безопасность' },
     ...(owner ? [{ value: 'admins' as Tab, label: 'Администраторы' }] : []),
   ];
   const locked = !owner;
@@ -378,6 +400,7 @@ export default function SettingsPage() {
         <>
           {tab === 'payments' && <Payments s={q.data} webhooks={q.data.webhooks} locked={locked} />}
           {tab === 'remnawave' && <RemnawaveTab s={q.data} locked={locked} />}
+          {tab === 'phone' && <PhoneAuth s={q.data} locked={locked} />}
           {tab === 'general' && <General s={q.data} locked={locked} />}
           {tab === 'growth' && <Growth s={q.data} locked={locked} />}
           {(tab === 'gate' || tab === 'topup' || tab === 'features' || tab === 'notifications' || tab === 'monitoring' || tab === 'appearance') && <MoreTabs tab={tab} s={q.data.settings} botUsername={q.data.env.botUsername} locked={locked} />}

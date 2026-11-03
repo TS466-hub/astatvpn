@@ -317,8 +317,8 @@ provision_vpn() {
         settings:{clients:[],decryption:"none"},
         sniffing:{enabled:true,destOverride:["http","tls","quic"]},
         streamSettings:{network:"tcp",security:"reality",
-          realitySettings:{show:false,xver:0,target:"www.microsoft.com:443",
-            serverNames:["www.microsoft.com"],privateKey:$priv,shortIds:[$sid]}}}],
+          realitySettings:{show:false,xver:0,target:"addons.mozilla.org:443",
+            serverNames:["addons.mozilla.org"],privateKey:$priv,shortIds:[$sid]}}}],
       outbounds:[{tag:"DIRECT",protocol:"freedom"},{tag:"BLOCK",protocol:"blackhole"}],
       routing:{rules:[
         {ip:["geoip:private"],outboundTag:"BLOCK"},
@@ -351,7 +351,20 @@ provision_vpn() {
     ok "Сквад ASTAT уже есть"
   fi
 }
-if [ -n "${API_TOKEN:-$ACCESS}" ]; then provision_vpn "${API_TOKEN:-$ACCESS}"; fi
+brand_subscription() {
+  local tok="$1" r u h profile routing
+  # Правила для Happ: российские сайты и адреса идут напрямую, остальное через VPN
+  profile="$(jq -nc --arg now "$(date +%s)" '{Name:"AstatVPN",GlobalProxy:"true",RemoteDNSType:"DoH",RemoteDNSDomain:"https://cloudflare-dns.com/dns-query",RemoteDNSIP:"1.1.1.1",DomesticDNSType:"DoU",DomesticDNSDomain:"",DomesticDNSIP:"77.88.8.8",Geoipurl:"https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat",Geositeurl:"https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat",LastUpdated:$now,DnsHosts:{"cloudflare-dns.com":"1.1.1.1"},DirectSites:["domain:ru","domain:su","domain:xn--p1ai","domain:xn--80asehdb","domain:xn--80aswg","geosite:category-ru","domain:yandex.com","domain:yandex.net","domain:yastatic.net","domain:vk.com","domain:vk.ru","domain:vkuser.net","domain:userapi.com","domain:mail.ru","domain:ok.ru","domain:mycdn.me","domain:sber.ru","domain:sberbank.com","domain:tinkoff.com","domain:wb.ru","domain:ozon.com","domain:avito.st"],DirectIp:["geoip:ru","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","224.0.0.0/4","255.255.255.255"],ProxySites:[],ProxyIp:[],BlockSites:[],BlockIp:[],DomainStrategy:"IPIfNonMatch",FakeDNS:"false"}')"
+  routing="happ://routing/onadd/$(printf '%s' "$profile" | base64 | tr -d '\n')"
+  r="$(api GET /api/subscription-settings "" "$tok")"
+  [ "$(http_code "$r")" = 200 ] || { warn "Настройки подписки недоступны — название задайте в панели вручную."; return 0; }
+  u="$(http_body "$r" | jq -r '.response.uuid')"
+  # support-url по умолчанию ведёт на заглушку dummy.docs.rw, поэтому убираем его
+  h="$(http_body "$r" | jq -c --arg routing "$routing" '.response.customResponseHeaders + {"profile-title":"rwEncodeBase64:AstatVPN", routing:$routing} | del(.["support-url"])')"
+  r="$(api PATCH /api/subscription-settings "$(jq -n --arg u "$u" --argjson h "$h" '{uuid:$u,customResponseHeaders:$h}')" "$tok")"
+  [ "$(http_code "$r")" = 200 ] || warn "Не удалось задать название подписки (HTTP $(http_code "$r"))."
+}
+if [ -n "${API_TOKEN:-$ACCESS}" ]; then provision_vpn "${API_TOKEN:-$ACCESS}"; brand_subscription "${API_TOKEN:-$ACCESS}"; fi
 
 # ---------------------------------------------------------------- страница подписок
 SUBDIR="$DIR/subscription"

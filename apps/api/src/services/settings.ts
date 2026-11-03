@@ -312,7 +312,19 @@ const statuspageSchema = z.object({
   /** подпись раздела LTE в статусе, например «LTE для белых списков (только в тарифе PURPLE)» */
   lte_note: z.string().max(160).default('LTE для белых списков'),
 });
+const phoneAuthSchema = z.object({
+  enabled: z.boolean().default(false),
+  service_id: z.string().max(40).default(''),
+  key: z.string().max(200).default(''),
+  /** пауза между звонками на один номер, секунд */
+  cooldown_sec: z.number().int().min(15).max(3600).default(60),
+  max_per_phone_day: z.number().int().min(1).max(30).default(5),
+  max_per_ip_day: z.number().int().min(1).max(1000).default(10),
+  /** общий потолок звонков за сутки: защищает баланс uCaller */
+  max_per_day: z.number().int().min(1).max(100000).default(300),
+});
 export const GROUPS = {
+  phone_auth: { schema: phoneAuthSchema, secrets: ['key'] },
   client_apps:{schema:clientAppsSchema,secrets:[] as string[]},
   admin_notifications: { schema: adminNotificationsSchema, secrets: [] as string[] },
   general: { schema: generalSchema, secrets: [] as string[] },

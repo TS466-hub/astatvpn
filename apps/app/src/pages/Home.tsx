@@ -12,6 +12,7 @@ import { PromoBanner } from '../components/PromoBanner';
 import { ClosureBanner, useClosure } from '../components/Closure';
 import { ServerStatusChip } from '../components/ServerStatusChip';
 import { flag } from './Locations';
+import { TelegramLink } from '../components/TelegramLink';
 
 export default function Home() {
   const me = useMe(); const sub = useSubscription(); const cfg = useConfig(); const nodes = useNodes();
@@ -35,6 +36,7 @@ export default function Home() {
     <ClosureBanner full />
     {!closing && <PromoBanner />}
     <ServerStatusChip />
+    {me.data && me.data.tgId === null && cfg.data?.botUsername && <TelegramLink />}
     <div className="orbit-home-grid space-y-5 md:space-y-0">
       <section className="signature-hero" aria-label="Ваша подписка">
         <OrbitArtwork design={design.id} />

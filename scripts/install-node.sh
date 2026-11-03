@@ -209,7 +209,12 @@ HOST_EXISTS=""
 if [ -n "$HOST_EXISTS" ]; then
   ok "Хост для $ADDRESS уже есть"
 else
-  hp="$(jq -n --arg p "$PROFILE_UUID" --arg i "$INBOUND_UUID" --arg rem "$NAME" --arg addr "$ADDRESS" --argjson port "$VPN_PORT" --arg n "$NODE_UUID" --arg sni "${SELFSTEAL:-www.microsoft.com}" \
+  # флаг страны в названии сервера: клиенты (Happ и др.) показывают его как значок
+  REMARK="$NAME"
+  if [[ "$COUNTRY" =~ ^[A-Z]{2}$ ]] && [ "$COUNTRY" != XX ]; then
+    REMARK="$(jq -rn --arg c "$COUNTRY" --arg n "$NAME" '($c | explode | map(. - 65 + 127462) | implode) + " " + $n')"
+  fi
+  hp="$(jq -n --arg p "$PROFILE_UUID" --arg i "$INBOUND_UUID" --arg rem "$REMARK" --arg addr "$ADDRESS" --argjson port "$VPN_PORT" --arg n "$NODE_UUID" --arg sni "${SELFSTEAL:-addons.mozilla.org}" \
     '{inbound:{configProfileUuid:$p,configProfileInboundUuid:$i},remark:$rem,address:$addr,port:$port,sni:$sni,fingerprint:"chrome",nodes:[$n]}')"
   r="$(api POST /api/hosts "$hp")"
   if ok2 "$r"; then ok "Хост добавлен в подписки"; else warn "Хост не создан (HTTP $(code "$r")): $(body "$r" | head -c 300) — добавьте в панели: Hosts → Create"; fi
