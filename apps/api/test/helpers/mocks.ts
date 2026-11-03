@@ -126,7 +126,7 @@ export async function startRemnawaveMock(token = 'rw-test-token') {
     if (req.method === 'GET' && path === '/api/hosts') return { json: { response: state.hosts } };
     if (req.method === 'PATCH' && path === '/api/hosts') {
       const h = state.hosts.find((x: any) => x.uuid === body.uuid); if (!h) return { status: 404, json: { message: 'no host' } };
-      h.address = body.address; return { json: { response: h } };
+      const { uuid: _uuid, ...patch } = body; Object.assign(h, patch); return { json: { response: h } };
     }
     if (req.method === 'GET' && path === '/api/internal-squads/') {
       return { json: { response: { total: state.squads.length, internalSquads: state.squads } } };

@@ -22,6 +22,7 @@ import { workerBeat } from './services/workerHealth.js';
 import { retentionTick } from './services/retention.js';
 import { incidentTick } from './services/networkIncidents.js';
 import { netTick } from './services/netprobe.js';
+import { hostFailoverTick } from './services/hostFailover.js';
 import { statusTick, syncStatusServers } from './services/serverStatus.js';
 import { installProcessGuards } from './lib/guards.js';
 
@@ -99,6 +100,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   'closure-tick': closureTick,
   retention: retentionTick,
   'status-tick': statusTick,
+  'host-failover': hostFailoverTick,
   'status-sync': syncStatusServers,
   cleanup,
   'lte-quota':syncLteAll,
@@ -134,6 +136,7 @@ async function main() {
   await queue.add('admin-daily-report', {}, { ...every(60_000), jobId: 'admin-daily-report' });
   await queue.add('admin-payment-notifications', {}, { ...every(30_000), jobId: 'admin-payment-notifications' });
   await queue.add('monitor', {}, { ...every(60_000), jobId: 'monitor' });
+  await queue.add('host-failover', {}, { ...every(60_000), jobId: 'host-failover' });
   await queue.add('lte-quota', {}, { ...every(10*60_000), jobId:'lte-quota' });
   await queue.add('cleanup', {}, { ...every(60 * 60_000), jobId: 'cleanup' });
 

@@ -176,6 +176,8 @@ const monitoringSchema = z.object({
   fail_threshold: z.number().int().min(1).max(10).default(2),
   /** автоматически включать техработы, когда Remnawave недоступна */
   auto_maintenance: z.boolean().default(false),
+  /** убирать из подписки серверы упавших нод и возвращать после восстановления */
+  host_failover: z.boolean().default(true),
 });
 const appearanceSchema = z.object({
   miniapp_design: z.enum(MINIAPP_DESIGN_IDS).default('orbit-signature'),

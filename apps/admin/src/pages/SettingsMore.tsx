@@ -104,6 +104,7 @@ function Monitoring({ s, locked }: { s: Record<string, any>; locked: boolean }) 
           <Field label="Порог ошибок подряд" hint="Сколько неудач подряд считаются аварией (1–10)"><Input type="number" min={1} max={10} value={v.fail_threshold} onChange={num(set, 'fail_threshold')} /></Field>
         </div>
         <Toggle label="Автоматические техработы" hint="Если Remnawave недоступна — временно блокируем покупки; снимаем, когда она вернётся" checked={v.auto_maintenance} onChange={(x) => set('auto_maintenance', x)} />
+        <Toggle label="Убирать упавшие серверы из подписки" hint="Если нода недоступна 3 минуты подряд, сервер пропадёт из подписки, а после восстановления вернётся сам. Последний работающий сервер не трогаем." checked={v.host_failover ?? true} onChange={(x: boolean) => set('host_failover', x)} />
       </>)}
     </GroupForm>
   );

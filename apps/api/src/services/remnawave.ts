@@ -36,7 +36,7 @@ const nodeSchema = z
     xrayUptime: z.union([z.string(), z.number()]).nullish(),
   })
   .passthrough();
-const hostSchema = z.object({ uuid: z.string(), remark: z.string().nullish(), address: z.string() }).passthrough();
+const hostSchema = z.object({ uuid: z.string(), remark: z.string().nullish(), address: z.string(), isDisabled: z.boolean().nullish(), nodes: z.array(z.string()).nullish() }).passthrough();
 export type RwHost = z.infer<typeof hostSchema>;
 export type RwNode = z.infer<typeof nodeSchema>;
 
@@ -367,6 +367,9 @@ export const remnawave = {
     return request('GET', '/api/hosts', z.array(hostSchema));
   },
 
+  async setHostDisabled(uuid: string, isDisabled: boolean): Promise<void> {
+    await request('PATCH', '/api/hosts', anyOk, { uuid, isDisabled });
+  },
   async updateHost(uuid: string, patch: { address: string }): Promise<void> {
     await request('PATCH', '/api/hosts', anyOk, { uuid, ...patch });
   },
