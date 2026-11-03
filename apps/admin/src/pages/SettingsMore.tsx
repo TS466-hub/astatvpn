@@ -105,6 +105,7 @@ function Monitoring({ s, locked }: { s: Record<string, any>; locked: boolean }) 
         </div>
         <Toggle label="Автоматические техработы" hint="Если Remnawave недоступна — временно блокируем покупки; снимаем, когда она вернётся" checked={v.auto_maintenance} onChange={(x) => set('auto_maintenance', x)} />
         <Toggle label="Убирать упавшие серверы из подписки" hint="Если нода недоступна 3 минуты подряд, сервер пропадёт из подписки, а после восстановления вернётся сам. Последний работающий сервер не трогаем." checked={v.host_failover ?? true} onChange={(x: boolean) => set('host_failover', x)} />
+        <Field label="Не использовать в «⚡ Авто»" hint="Адреса или названия серверов через запятую. Они останутся в подписке для ручного выбора. Работает в Happ и v2rayNG."><Input value={v.auto_exclude ?? ''} maxLength={500} placeholder="87.121.89.53" onChange={(e) => set('auto_exclude', e.target.value)} /></Field>
       </>)}
     </GroupForm>
   );

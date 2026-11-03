@@ -11,6 +11,7 @@ import { verifyToken } from './lib/jwt.js';
 import { RemnawaveError, RW_USER_MESSAGE } from './services/remnawave.js';
 import { adminRoutes } from './routes/admin/index.js';
 import { publicRoutes } from './routes/public.js';
+import { subscriptionProxyRoutes } from './routes/subscriptionProxy.js';
 import { webhookRoutes } from './routes/webhooks.js';
 
 /**
@@ -90,6 +91,8 @@ export async function buildApp(opts: { logger?: boolean } = {}): Promise<Fastify
   });
   app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: { message: 'Не найдено', code: 'not_found' } }));
 
+  // вне /api/v1: сюда шлюз направляет запросы подписки от приложений на Xray JSON
+  await app.register(subscriptionProxyRoutes);
   await app.register(
     async (v1) => {
       await v1.register(publicRoutes);

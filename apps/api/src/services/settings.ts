@@ -178,6 +178,8 @@ const monitoringSchema = z.object({
   auto_maintenance: z.boolean().default(false),
   /** убирать из подписки серверы упавших нод и возвращать после восстановления */
   host_failover: z.boolean().default(true),
+  /** адреса или названия серверов через запятую, которые не участвуют в «⚡ Авто» */
+  auto_exclude: z.string().max(500).default(''),
 });
 const appearanceSchema = z.object({
   miniapp_design: z.enum(MINIAPP_DESIGN_IDS).default('orbit-signature'),

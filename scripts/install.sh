@@ -497,7 +497,15 @@ $PANEL_DOMAIN {
 }
 
 $SUB_DOMAIN {
-	reverse_proxy remnawave-subscription-page:3010
+	# приложения на Xray JSON получают подписку через API: он добавляет пункт «⚡ Авто»
+	@xrayjson header_regexp User-Agent (?i)^(happ|v2rayng|v2rayn)\b
+	handle @xrayjson {
+		rewrite * /sub-auto{uri}
+		reverse_proxy api:3000
+	}
+	handle {
+		reverse_proxy remnawave-subscription-page:3010
+	}
 }
 CADDY
   [ -n "$RW_TOKEN" ] || warn "API-токен Remnawave не создан автоматически — укажите его в админке: Настройки → Remnawave."

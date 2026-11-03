@@ -8,3 +8,6 @@ coverage
 !.env.example
 .vscode/
 .idea/
+
+# заметки для Claude Code с адресами серверов: только локально
+CLAUDE.md
