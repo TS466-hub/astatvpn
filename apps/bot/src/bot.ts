@@ -171,30 +171,44 @@ export function createBot(o: BotOptions) {
       .row()
       .text('📱 Мои устройства', 'devices')
       .text('⬅️ Меню', 'menu');
-    await ctx.reply(
-      `🔑 <b>Ваша ссылка подписки</b>\n<code>${esc(s.subUrl)}</code>\n\n1. Установите приложение (Happ, Hiddify, Incy, Streisand или Karing)\n2. Нажмите на кнопку приложения ниже — подписка добавится сама\n3. Или скопируйте ссылку и добавьте её вручную\n\n${appInfo?'По информации администрации:\n'+appInfo+'\n\nСохраните установленное приложение. В другом клиенте используйте прежнюю ссылку подписки.\n\n':''}${s.state === 'expired' ? '⚠️ Подписка закончилась — продлите её.' : ''}`,
-      { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } },
+    await photoScreen(
+      ctx,
+      'astat-connect.png',
+      `🔑 <b>Ваша ссылка подписки</b>\n<code>${esc(s.subUrl)}</code>\n\n1. Установите приложение (Happ, Hiddify, Incy, Streisand или Karing)\n2. Нажмите на кнопку приложения ниже — подписка добавится сама\n3. Или скопируйте ссылку и добавьте её вручную\n\n${appInfo?'По информации администрации:\n'+appInfo+'\n\nСохраните установленное приложение. В другом клиенте используйте прежнюю ссылку подписки.\n\n':''}${s.state === 'expired' ? '⚠️ Подписка закончилась — продлите её.' : ''}`.trim(),
+      kb,
     );
   }
 
-  async function showServerStatus(ctx: Context, edit = false) {
-    const [d, cfg] = await Promise.all([api.call<ServerStatusDTO>(ctx.from!, 'GET', '/status/servers'), getConfig(ctx)]);
-    const kb = new InlineKeyboard().text('🔄 Обновить', 'status').row().text('⬅️ Меню', 'menu');
-    const text = statusScreen(d, cfg.brandName);
-    const image = `${o.appUrl.replace(/\/$/, '')}/astat-status.png`;
-    // Подпись к фото ограничена 1024 символами; длинный список и сбой загрузки фото показываем обычным текстом.
+  /** Экран с картинкой из apps/app/public. Подпись к фото ограничена 1024 символами;
+   * длинный текст и сбой загрузки фото показываем обычным сообщением. */
+  async function photoScreen(ctx: Context, file: string, text: string, kb: InlineKeyboard, edit = false) {
+    const image = `${o.appUrl.replace(/\/$/, '')}/${file}`;
     if (text.length <= 1000) {
       try {
-        // «Обновить» и переход с экрана с фото правят то же сообщение, чтобы не копить экраны в чате
+        // Переход с экрана с фото правит то же сообщение, чтобы не копить экраны в чате
         if (edit && ctx.callbackQuery?.message?.photo) await ctx.editMessageMedia({ type: 'photo', media: image, caption: text, parse_mode: 'HTML' }, { reply_markup: kb });
         else await ctx.replyWithPhoto(image, { caption: text, parse_mode: 'HTML', reply_markup: kb });
         return;
       } catch (e) {
         if (String((e as Error).message).includes('not modified')) return;
-        console.error('[bot] status photo failed:', (e as Error).message);
+        console.error(`[bot] photo ${file} failed:`, (e as Error).message);
       }
     }
-    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb, link_preview_options: { is_disabled: true } });
+  }
+
+  /** Правит текущий экран (текст или подпись к фото), при неудаче присылает новый. */
+  async function editScreen(ctx: Context, text: string, kb: InlineKeyboard) {
+    const opts = { parse_mode: 'HTML' as const, reply_markup: kb };
+    const edit = ctx.callbackQuery?.message?.photo ? ctx.editMessageCaption({ caption: text, ...opts }) : ctx.editMessageText(text, opts);
+    await edit.catch(() => ctx.reply(text, opts));
+  }
+
+  async function showServerStatus(ctx: Context, edit = false) {
+    const [d, cfg] = await Promise.all([api.call<ServerStatusDTO>(ctx.from!, 'GET', '/status/servers'), getConfig(ctx)]);
+    const kb = new InlineKeyboard().text('🔄 Обновить', 'status').row().text('⬅️ Меню', 'menu');
+    // «Обновить» правит то же сообщение
+    await photoScreen(ctx, 'astat-status.png', statusScreen(d, cfg.brandName), kb, edit);
   }
 
   async function showPlans(ctx: Context) {
@@ -317,7 +331,7 @@ export function createBot(o: BotOptions) {
     if (!d.active && !d.devices.length) {
       const t = 'У вас нет активной подписки, поэтому устройств пока нет.';
       const kb = new InlineKeyboard().text('💳 Тарифы', 'plans').row().text('⬅️ Меню', 'menu');
-      if (edit && ctx.callbackQuery) await ctx.editMessageText(t, { reply_markup: kb }).catch(() => ctx.reply(t, { reply_markup: kb }));
+      if (edit && ctx.callbackQuery) await editScreen(ctx, t, kb);
       else await ctx.reply(t, { reply_markup: kb });
       return;
     }
@@ -338,9 +352,7 @@ export function createBot(o: BotOptions) {
     kb.text('➕ Подключить', 'connect');
     kb.text('🛒 Докупить место', 'addons');
     kb.row().text('⬅️ Меню', 'menu');
-    const text = lines.join('\n');
-    if (edit && ctx.callbackQuery) await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: kb }).catch(() => ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb }));
-    else await ctx.reply(text, { parse_mode: 'HTML', reply_markup: kb });
+    await photoScreen(ctx, 'astat-devices.png', lines.join('\n'), kb, edit);
   }
 
   async function showAddons(ctx: Context) {
@@ -359,7 +371,7 @@ export function createBot(o: BotOptions) {
     }
     if(products.some(p=>p.kind==='lte'))lines.push('\nLTE-пакеты учитываются отдельно от общего безлимитного VPN-трафика.');
     kb.text('⬅️ Меню', 'menu');
-    await ctx.reply(lines.join('\n'), { parse_mode: 'HTML', reply_markup: kb });
+    await photoScreen(ctx, 'astat-addons.png', lines.join('\n'), kb);
   }
 
   const questReward = (q: QuestDTO, bonus = 0) => (q.rewardType === 'days' ? `+${q.rewardValue} ${pluralDays(q.rewardValue)}` : `+${formatRub(q.rewardValue + bonus)}`);
@@ -815,10 +827,8 @@ export function createBot(o: BotOptions) {
     const d = await api.call<DevicesDTO>(ctx.from!, 'GET', '/devices');
     const v = d.devices.find((x) => x.id === ctx.match[1]);
     if (!v) return void (await showDevices(ctx, true, 'ℹ️ Это устройство уже удалено.'));
-    await ctx.editMessageText(`Удалить устройство <b>${esc(v.name)}</b>?\nОно освободит место и потеряет доступ, пока его не подключат снова.`, {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard().text('🗑 Да, удалить', `dvy:${v.id}`).row().text('↩️ Отмена', 'devices'),
-    });
+    await editScreen(ctx, `Удалить устройство <b>${esc(v.name)}</b>?\nОно освободит место и потеряет доступ, пока его не подключат снова.`,
+      new InlineKeyboard().text('🗑 Да, удалить', `dvy:${v.id}`).row().text('↩️ Отмена', 'devices'));
   }));
   bot.callbackQuery(/^dvy:([0-9a-f]{16})$/, (ctx) => guard(ctx, async () => {
     await ack(ctx);
@@ -832,10 +842,8 @@ export function createBot(o: BotOptions) {
   }));
   bot.callbackQuery('dvall', (ctx) => guard(ctx, async () => {
     await ack(ctx);
-    await ctx.editMessageText('Удалить <b>все</b> устройства? Их придётся подключить заново.', {
-      parse_mode: 'HTML',
-      reply_markup: new InlineKeyboard().text('🗑 Да, удалить все', 'dvally').row().text('↩️ Отмена', 'devices'),
-    });
+    await editScreen(ctx, 'Удалить <b>все</b> устройства? Их придётся подключить заново.',
+      new InlineKeyboard().text('🗑 Да, удалить все', 'dvally').row().text('↩️ Отмена', 'devices'));
   }));
   bot.callbackQuery('dvally', (ctx) => guard(ctx, async () => {
     await ack(ctx);
