@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'astat_api.dart';
 import 'models.dart';
+import 'routing_profile.dart';
 import 'share_link.dart';
 import 'storage.dart';
 import 'subscription.dart';
@@ -73,6 +75,8 @@ class AppState extends ChangeNotifier {
   DateTime? _lastSample;
   int _lastRx = 0, _lastTx = 0;
   (String, String)? _connectedSelection;
+  String? _connectedRouting;
+  String? get _routingSignature => settings.routingProfile == null ? null : jsonEncode(settings.routingProfile!.toJson());
 
   (String, String)? get _selection {
     final p = profile;
@@ -82,7 +86,7 @@ class AppState extends ChangeNotifier {
 
   bool get canSelectServer => !busy && (status.state == VpnState.connected || status.state == VpnState.disconnected);
 
-  bool get needsReconnect => status.state == VpnState.connected && _selection != null && _selection != _connectedSelection;
+  bool get needsReconnect => status.state == VpnState.connected && _selection != null && (_selection != _connectedSelection || _routingSignature != _connectedRouting);
 
   AppSettings get settings => data.settings;
   List<Profile> get profiles => data.profiles;
@@ -110,6 +114,7 @@ class AppState extends ChangeNotifier {
     status = await vpn.status();
     if (status.state != VpnState.disconnected && (status.serverName == null || status.serverName == server?.name)) {
       _connectedSelection = _selection;
+      _connectedRouting = _routingSignature;
     }
     _sub = vpn.statusStream.listen(_onStatus);
     ready = true;
@@ -183,6 +188,7 @@ class AppState extends ChangeNotifier {
         lastError = 'Без разрешения на VPN подключиться нельзя';
         return;
       }
+      final routingSignature = _routingSignature;
       final config = jsonEncode(buildXrayConfig(s, settings, tunPlatform));
       if (reconnect) {
         await vpn.stop();
@@ -194,10 +200,13 @@ class AppState extends ChangeNotifier {
       }
       await vpn.start(config: config, name: s.name, filter: settings.appFilter, apps: settings.apps);
       _connectedSelection = selection;
+      _connectedRouting = routingSignature;
     } on VpnException catch (e) {
       lastError = e.message;
       final v = vpn;
       if (v is DesktopVpn) needsService = !await v.serviceAvailable();
+    } on FormatException catch (e) {
+      lastError = e.message;
     } catch (e) {
       lastError = 'Не удалось подключиться';
     } finally {
@@ -283,6 +292,37 @@ class AppState extends ChangeNotifier {
     change(settings);
     _save();
     notifyListeners();
+  }
+
+  Future<RoutingProfile> importRoutingProfile(String input) async {
+    final payload = routingPayload(input);
+    final uri = Uri.tryParse(payload);
+    if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) return parseRoutingProfile(payload);
+    if (uri.scheme != 'https' || uri.host.isEmpty || uri.userInfo.isNotEmpty) {
+      throw const FormatException('Для импорта по ссылке нужен HTTPS-адрес');
+    }
+    final parts = uri.pathSegments;
+    final source = uri.host == 'github.com' && parts.length >= 5 && parts[2] == 'blob'
+        ? Uri.https('raw.githubusercontent.com', '/${parts[0]}/${parts[1]}/${parts.skip(3).join('/')}')
+        : uri;
+    final client = http.Client();
+    try {
+      final response = await client.send(http.Request('GET', source)).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) throw FormatException('Сервер профиля ответил кодом ${response.statusCode}');
+      if ((response.contentLength ?? 0) > routingImportLimit) throw const FormatException('Профиль слишком большой');
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in response.stream.timeout(const Duration(seconds: 15))) {
+        if (bytes.length + chunk.length > routingImportLimit) throw const FormatException('Профиль слишком большой');
+        bytes.add(chunk);
+      }
+      return parseRoutingProfile(routingPayload(utf8.decode(bytes.takeBytes())));
+    } on TimeoutException {
+      throw const FormatException('Сервер профиля не отвечает');
+    } on http.ClientException {
+      throw const FormatException('Не удалось загрузить профиль по ссылке');
+    } finally {
+      client.close();
+    }
   }
 
   // ---------- подписки ----------

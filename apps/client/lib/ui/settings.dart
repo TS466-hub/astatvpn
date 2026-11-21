@@ -9,6 +9,7 @@ import '../core/astat_api.dart';
 import '../core/models.dart';
 import '../core/vpn.dart';
 import 'login.dart';
+import 'routing.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -45,11 +46,18 @@ class SettingsScreen extends StatelessWidget {
       const SectionTitle('Подключение'),
       RowsPanel(children: [
         SettingRow(
-          title: 'Российские сайты напрямую',
-          subtitle: 'Сайты и адреса из России открываются без VPN. Для подписки ASTAT правила приходят с сервера.',
-          trailing: Check(s.ruDirect),
-          onTap: () => app.updateSettings((x) => x.ruDirect = !x.ruDirect),
+          title: 'Маршрутизация',
+          subtitle: s.routingProfile?.name ?? 'Импорт Happ и Incy, свои правила',
+          trailing: const _Arrow(),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => RoutingScreen(app: app))),
         ),
+        if (s.routingProfile == null)
+          SettingRow(
+            title: 'Российские сайты напрямую',
+            subtitle: 'Сайты и адреса из России открываются без VPN. Для подписки ASTAT правила приходят с сервера.',
+            trailing: Check(s.ruDirect),
+            onTap: () => app.updateSettings((x) => x.ruDirect = !x.ruDirect),
+          ),
         if (Platform.isAndroid)
           SettingRow(
             title: 'Приложения',

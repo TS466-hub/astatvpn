@@ -1,51 +1,62 @@
 #!/usr/bin/env python3
-"""Рисует значок приложения — пиксельную букву A на чёрном фоне — и раскладывает его по всем системам.
-Запуск из apps/client: python3 tool/make_icons.py. Сторонние библиотеки не нужны."""
+"""Рисует монохромную букву A и генерирует значки для всех платформ.
+
+Запуск из apps/client: python3 tool/make_icons.py. Сторонние библиотеки не нужны.
+"""
+import math
 import os
 import struct
 import zlib
 
-GLYPH = [
-    "..###..",
-    ".##.##.",
-    "##...##",
-    "##...##",
-    "#######",
-    "##...##",
-    "##...##",
-]
-COLS, ROWS = len(GLYPH[0]), len(GLYPH)
-BLACK, WHITE, CLEAR = (0, 0, 0, 255), (255, 255, 255, 255), (0, 0, 0, 0)
+BLACK, WHITE, CLEAR = 0, 246, (0, 0)
 
 
-def render(size, glyph_height, background=BLACK, plate=None, radius=0.0):
-    """glyph_height — высота буквы в долях стороны. plate — доля стороны под чёрную плашку со скруглением
-    (значок macOS), вне плашки прозрачно."""
-    cell = glyph_height / ROWS
-    left, top = (1 - cell * COLS) / 2, (1 - glyph_height) / 2
+def coverage(distance, size):
+    """Сглаживает границу фигуры на ширину одного пикселя."""
+    return min(1, max(0, 0.5 - distance * size))
+
+
+def segment_distance(x, y, start, end):
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    t = min(1, max(0, ((x - start[0]) * dx + (y - start[1]) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(x - start[0] - t * dx, y - start[1] - t * dy)
+
+
+def render(size, glyph_height, background=(BLACK, 255), plate=None, radius=0.0):
+    """Плашка с прозрачными полями используется в macOS и Windows."""
+    stroke = glyph_height * 0.151
+    left, right = 0.5 - glyph_height * 0.385, 0.5 + glyph_height * 0.385
+    top = 0.49 - glyph_height / 2 + stroke / 2
+    bottom = 0.49 + glyph_height / 2 - stroke / 2
+    beam = top + (bottom - top) * 0.68
+    apex = (0.5, top)
+    segments = [
+        ((left, bottom), apex),
+        (apex, (right, bottom)),
+        ((0.5 + (left - 0.5) * 0.68, beam), (0.5 + (right - 0.5) * 0.68, beam)),
+    ]
+
     rows = []
     for py in range(size):
         row = bytearray()
         for px in range(size):
             x, y = (px + 0.5) / size, (py + 0.5) / size
-            color = background
+            shade, alpha = background
             if plate is not None:
-                color = BLACK if inside_plate(x, y, plate, radius) else CLEAR
-            gx, gy = (x - left) / cell, (y - top) / cell
-            if 0 <= gx < COLS and 0 <= gy < ROWS and GLYPH[int(gy)][int(gx)] == "#":
-                color = WHITE
-            row += bytes(color)
+                qx = abs(x - 0.5) - plate / 2 + radius
+                qy = abs(y - 0.5) - plate / 2 + radius
+                distance = math.hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - radius
+                alpha = round(255 * coverage(distance, size))
+            if left - stroke <= x <= right + stroke and top - stroke <= y <= bottom + stroke:
+                distance = min(segment_distance(x, y, start, end) for start, end in segments)
+                ink = coverage(distance - stroke / 2, size)
+                if ink > 0:
+                    opacity = ink + alpha / 255 * (1 - ink)
+                    shade = round((WHITE * ink + shade * alpha / 255 * (1 - ink)) / opacity)
+                    alpha = round(255 * opacity)
+            row.extend((shade, shade, shade, alpha))
         rows.append(bytes(row))
     return rows
-
-
-def inside_plate(x, y, plate, radius):
-    lo, hi = (1 - plate) / 2, (1 + plate) / 2
-    if not (lo <= x <= hi and lo <= y <= hi):
-        return False
-    cx = min(max(x, lo + radius), hi - radius)
-    cy = min(max(y, lo + radius), hi - radius)
-    return (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2
 
 
 def png(rows, alpha=True):
@@ -70,7 +81,7 @@ def write(path, data):
 
 
 def ico(sizes):
-    images = [png(render(s, 0.54)) for s in sizes]
+    images = [png(render(s, 0.60, plate=0.94, radius=0.175)) for s in sizes]
     out = struct.pack("<HHH", 0, 1, len(sizes))
     offset = 6 + 16 * len(sizes)
     for s, data in zip(sizes, images):
@@ -80,7 +91,9 @@ def ico(sizes):
 
 
 def main():
-    full = lambda s: png(render(s, 0.54), alpha=False)  # noqa: E731
+    def full(size):
+        return png(render(size, 0.55), alpha=False)
+
     write("assets/icon/icon-1024.png", full(1024))
     # Android: обычный значок и слой для адаптивного (система обрезает края, буква меньше)
     for name, scale in {"mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}.items():
@@ -96,7 +109,7 @@ def main():
             write(f"{ios}/{name}", full(round(float(points.split("x")[0]) * int(scale[0]))))
     # macOS: чёрная плашка со скруглёнными углами и полями, как у остальных программ
     for s in (16, 32, 64, 128, 256, 512, 1024):
-        write(f"macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_{s}.png", png(render(s, 0.44, plate=0.805, radius=0.18)))
+        write(f"macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_{s}.png", png(render(s, 0.46, plate=0.805, radius=0.18)))
     write("windows/runner/resources/app_icon.ico", ico([16, 24, 32, 48, 64, 256]))
     print("Значки обновлены")
 

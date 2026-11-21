@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:astatvpn/core/models.dart';
+import 'package:astatvpn/core/routing_profile.dart';
 import 'package:astatvpn/core/subscription.dart';
 import 'package:astatvpn/core/xray_config.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -71,6 +72,21 @@ void main() {
       await accepts(buildProbeConfig(server));
     }, skip: skip);
   }
+
+  test('ядро принимает правила из профиля Incy', () async {
+    final profile = parseRoutingProfile('''{
+      "Name":"Incy",
+      "GlobalProxy":"false",
+      "DomainStrategy":"IPIfNonMatch",
+      "DirectSites":["geosite:ru"],
+      "DirectIp":["geoip:ru","192.168.0.0/16"],
+      "ProxySites":["example.com","keyword:example"],
+      "BlockSites":["geosite:category-ads-all"]
+    }''');
+    final settings = AppSettings(routingProfileId: 'incy', routingProfiles: {'incy': profile});
+    final server = parseSubscription(_links.values.first).servers.single;
+    await accepts(withoutTun(buildXrayConfig(server, settings, TunPlatform.android)));
+  }, skip: skip);
 
   test('ядро принимает готовую конфигурацию подписки с «Авто»', () async {
     Map<String, dynamic> proxy(String tag) => {

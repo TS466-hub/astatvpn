@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'routing_profile.dart';
+
 /// Один сервер из подписки. Либо отдельный исходящий канал (из ссылки), либо готовая конфигурация Xray (из JSON-подписки).
 class ServerEntry {
   ServerEntry({
@@ -150,7 +152,10 @@ class AppSettings {
     this.theme = ThemeChoice.dark,
     this.autoUpdate = true,
     this.verboseLog = false,
-  }) : apps = apps ?? [];
+    Map<String, RoutingProfile>? routingProfiles,
+    this.routingProfileId,
+  })  : routingProfiles = routingProfiles ?? {},
+        apps = apps ?? [];
 
   /// Российские сайты и адреса идут мимо VPN. Действует на серверы из ссылок; в готовых конфигурациях правила задаёт подписка.
   bool ruDirect;
@@ -162,6 +167,10 @@ class AppSettings {
 
   /// Подробный журнал ядра: ход каждого соединения с адресами сайтов. Только для разбора сбоя.
   bool verboseLog;
+  final Map<String, RoutingProfile> routingProfiles;
+  String? routingProfileId;
+
+  RoutingProfile? get routingProfile => routingProfiles[routingProfileId];
 
   Map<String, dynamic> toJson() => {
         'ruDirect': ruDirect,
@@ -171,6 +180,8 @@ class AppSettings {
         'theme': theme.name,
         'autoUpdate': autoUpdate,
         'verboseLog': verboseLog,
+        if (routingProfiles.isNotEmpty) 'routingProfiles': routingProfiles.map((id, profile) => MapEntry(id, profile.toJson())),
+        if (routingProfileId != null) 'routingProfileId': routingProfileId,
       };
 
   static AppSettings fromJson(Map<String, dynamic> j) => AppSettings(
@@ -181,7 +192,25 @@ class AppSettings {
         theme: ThemeChoice.values.firstWhere((m) => m.name == j['theme'], orElse: () => ThemeChoice.dark),
         autoUpdate: j['autoUpdate'] != false,
         verboseLog: j['verboseLog'] == true,
+        routingProfiles: _readRoutingProfiles(j['routingProfiles']),
+        routingProfileId: j['routingProfileId'] is String ? j['routingProfileId'] as String : null,
       );
+}
+
+Map<String, RoutingProfile> _readRoutingProfiles(Object? value) {
+  final profiles = <String, RoutingProfile>{};
+  if (value is Map<String, dynamic>) {
+    for (final entry in value.entries) {
+      final json = entry.value;
+      if (json is! Map<String, dynamic>) continue;
+      try {
+        profiles[entry.key] = RoutingProfile.fromJson(json);
+      } on FormatException {
+        // Повреждённый профиль не должен сбрасывать остальные настройки.
+      }
+    }
+  }
+  return profiles;
 }
 
 /// Короткий устойчивый идентификатор: одинаковые серверы после обновления подписки сохраняют выбор и замеры.

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'models.dart';
+import 'routing_profile.dart';
 
 /// Сборка конфигурации Xray.
 ///
@@ -102,6 +103,8 @@ Map<String, dynamic> _clone(Map<String, dynamic> m) => (jsonDecode(jsonEncode(m)
 /// Готовая конфигурация для запуска ядра.
 Map<String, dynamic> buildXrayConfig(ServerEntry server, AppSettings settings, TunPlatform platform) {
   final config = server.full != null ? _fromFull(_clone(server.full!)) : _fromOutbound(_clone(server.outbound!), settings);
+  final profile = settings.routingProfile;
+  if (profile != null) _applyRoutingProfile(config, profile);
   config['inbounds'] = [_tunInbound(platform)];
   config['log'] = {'loglevel': settings.verboseLog ? 'info' : 'warning'};
   return config;
@@ -129,7 +132,7 @@ Map<String, dynamic> buildProbeConfig(ServerEntry server) {
 
 Map<String, dynamic> _fromOutbound(Map<String, dynamic> proxy, AppSettings settings) {
   proxy['tag'] = 'proxy';
-  final ru = settings.ruDirect;
+  final ru = settings.ruDirect && settings.routingProfile == null;
   return {
     'dns': {
       'tag': _dnsTag,
@@ -280,6 +283,88 @@ Map<String, dynamic> _fromFull(Map<String, dynamic> config) {
   ];
   config['routing'] = routing;
   return config;
+}
+
+void _applyRoutingProfile(Map<String, dynamic> config, RoutingProfile profile) {
+  final routing = config['routing'] as Map<String, dynamic>;
+  final rules = (routing['rules'] as List).cast<Map<String, dynamic>>();
+  final outbounds = (config['outbounds'] as List).cast<Map<String, dynamic>>();
+
+  String ensureTag(String protocol) {
+    final existing = outbounds.where((o) => o['protocol'] == protocol && o['tag'] is String && o['tag'] != '').firstOrNull;
+    if (existing != null) return existing['tag'] as String;
+    final tag = _unusedOutboundTag(outbounds, protocol);
+    outbounds.add({'protocol': protocol, 'tag': tag});
+    return tag;
+  }
+
+  final direct = <String, String>{'outboundTag': ensureTag('freedom')};
+  final proxy = _profileProxyRoute(routing, rules, outbounds);
+  final targets = {
+    RouteAction.direct: direct,
+    RouteAction.block: {'outboundTag': ensureTag('blackhole')},
+    RouteAction.proxy: proxy,
+  };
+  Map<String, dynamic> rule(Map<String, dynamic> match, Map<String, String> target) => {
+        'type': 'field',
+        'inboundTag': [tunTag],
+        ...match,
+        ...target,
+      };
+
+  routing['domainStrategy'] = profile.strategy;
+  routing['rules'] = [
+    rules.first, // Перехват DNS на входе TUN.
+    for (final action in profile.order)
+      if (profile.groups[action] case final group?) ...[
+        if (group.domains.isNotEmpty)
+          rule({
+            'domain': [for (final domain in group.domains) _bundledGeosite(domain)],
+          }, targets[action]!),
+        if (group.ips.isNotEmpty) rule({'ip': group.ips}, targets[action]!),
+      ],
+    rule({'network': 'tcp,udp'}, profile.globalProxy ? proxy : direct),
+    ...rules.skip(1), // Служебный DNS и остальные внутренние правила подписки.
+  ];
+}
+
+String _bundledGeosite(String domain) {
+  // Профили на базе Loyalsoldier используют RU; в базе v2fly та же категория имеет другое имя.
+  if (domain.toLowerCase() == 'geosite:ru') return 'geosite:category-ru';
+  return domain;
+}
+
+Map<String, String> _profileProxyRoute(
+  Map<String, dynamic> routing,
+  List<Map<String, dynamic>> rules,
+  List<Map<String, dynamic>> outbounds,
+) {
+  // Для «Авто» сохраняем балансировщик из общего правила подписки.
+  final balancers = routing['balancers'];
+  final tags = balancers is List ? balancers.whereType<Map>().map((b) => b['tag']).whereType<String>().toSet() : <String>{};
+  for (final rule in rules) {
+    final tag = rule['balancerTag'];
+    if (tag is String &&
+        tags.contains(tag) &&
+        rule.keys.every({'type', 'inboundTag', 'network', 'balancerTag'}.contains) &&
+        (rule['inboundTag'] == null || (_tags(rule['inboundTag'])?.contains(tunTag) ?? false))) {
+      return {'balancerTag': tag};
+    }
+  }
+  final proxies = outbounds.where((o) => !_localProtocols.contains(o['protocol']));
+  final proxy = proxies.where((o) => o['tag'] == 'proxy').firstOrNull ?? proxies.firstOrNull;
+  if (proxy == null) throw const FormatException('У сервера нет VPN-канала для правил маршрутизации');
+  if (proxy['tag'] is! String || proxy['tag'] == '') proxy['tag'] = _unusedOutboundTag(outbounds, 'proxy');
+  return {'outboundTag': proxy['tag'] as String};
+}
+
+String _unusedOutboundTag(List<Map<String, dynamic>> outbounds, String suffix) {
+  final used = outbounds.map((outbound) => outbound['tag']).toSet();
+  var tag = 'astat-routing-$suffix';
+  for (var i = 2; used.contains(tag); i++) {
+    tag = 'astat-routing-$suffix-$i';
+  }
+  return tag;
 }
 
 /// Список тегов в правиле Xray: массив или строка через запятую.
