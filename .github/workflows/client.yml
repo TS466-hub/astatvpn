@@ -85,6 +85,8 @@ jobs:
       - name: Тесты службы
         run: cd core && go vet ./... && go test ./...
       - name: Служба и ядро Xray
+        env:
+          ARCHS: amd64
         run: tool/build_core_windows.sh
       - run: flutter pub get
       - name: Сборка приложения

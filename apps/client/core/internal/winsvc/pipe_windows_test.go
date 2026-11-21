@@ -83,11 +83,22 @@ func TestPipeRequest(t *testing.T) {
 	}
 }
 
+func openPipe(name *uint16, access uint32) (windows.Handle, error) {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		handle, err := windows.CreateFile(name, access, 0, nil, windows.OPEN_EXISTING, 0, 0)
+		if err != windows.ERROR_PIPE_BUSY || time.Now().After(deadline) {
+			return handle, err
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestPipeSecurity(t *testing.T) {
 	stop := listen(t)
 	defer stop()
 	name, _ := windows.UTF16PtrFromString(proto.PipeName)
-	handle, err := windows.CreateFile(name, clientAccess, 0, nil, windows.OPEN_EXISTING, 0, 0)
+	handle, err := openPipe(name, clientAccess)
 	if err != nil {
 		t.Fatalf("канал не открылся: %v", err)
 	}
@@ -134,10 +145,12 @@ func TestPipeSecurity(t *testing.T) {
 	}
 
 	// с GENERIC_WRITE обычной программе канал не откроется; у администратора (как в CI) откроется
-	if h, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE, 0, nil, windows.OPEN_EXISTING, 0, 0); err == nil {
+	if h, err := openPipe(name, windows.GENERIC_READ|windows.GENERIC_WRITE); err == nil {
 		windows.CloseHandle(h)
 		if !windows.GetCurrentProcessToken().IsElevated() {
 			t.Error("канал открылся с GENERIC_WRITE без прав администратора")
 		}
+	} else if err != windows.ERROR_ACCESS_DENIED {
+		t.Fatalf("не удалось проверить GENERIC_WRITE: %v", err)
 	}
 }
