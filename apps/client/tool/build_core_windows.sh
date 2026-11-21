@@ -45,7 +45,7 @@ if [ "$actual" != "$WINTUN_SHA256" ]; then
   exit 1
 fi
 rm -rf "$CACHE/wintun"
-unzip -q -o "$zip" 'wintun/bin/*' 'wintun/LICENSE.txt' -d "$CACHE"
+unzip -q -o "$zip" -d "$CACHE"
 
 # --- геобазы ------------------------------------------------------------------------------------------
 # Если ядро для Android уже собиралось, берём те же файлы: на всех платформах будут одинаковые списки.
