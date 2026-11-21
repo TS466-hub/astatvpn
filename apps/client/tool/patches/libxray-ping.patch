@@ -1,0 +1,40 @@
+diff --git a/xray/ping_batch.go b/xray/ping_batch.go
+index c663598..9bed6fe 100644
+--- a/xray/ping_batch.go
++++ b/xray/ping_batch.go
+@@ -22,7 +22,7 @@ import (
+ )
+ 
+ const (
+-	maxPingBatchConfigs = 5
++	maxPingBatchConfigs = 64
+ )
+ 
+ type PingBatchItem struct {
+@@ -356,7 +356,6 @@ func probeOutbound(
+ ) PingBatchResult {
+ 	httpTimeout := time.Second * time.Duration(timeout)
+ 	transport := &http.Transport{
+-		DisableKeepAlives: true,
+ 		DialContext: func(
+ 			ctx context.Context,
+ 			network string,
+@@ -379,7 +378,18 @@ func probeOutbound(
+ 		Transport: transport,
+ 		Timeout:   httpTimeout,
+ 	}
++	// AstatVPN: the first request also pays for connection setup (proxy and target
++	// handshakes), which is several round trips. It only opens the connection here;
++	// the reported delay is the best of two more requests over the same connection.
+ 	delay, err := nodep.PingHTTPRequest(client, targetURL, timeout)
++	if err == nil {
++		repeat := &http.Client{Transport: transport, Timeout: 2 * time.Second}
++		for range 2 {
++			if again, repeatErr := nodep.PingHTTPRequest(repeat, targetURL, 2); repeatErr == nil && again < delay {
++				delay = again
++			}
++		}
++	}
+ 	result := PingBatchResult{Success: true, Delay: delay}
+ 	if err != nil {
+ 		result = failedPingBatchResult(delay, err)

@@ -1,0 +1,6 @@
+# собранные файлы службы в git не хранятся: их делает tool/build_core_windows.sh в build/core/windows/
+*.exe
+*.dll
+*.dat
+*.test
+/bin/
