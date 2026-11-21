@@ -108,13 +108,17 @@ func TestPipeSecurity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// по владельцу приложение отличает канал службы от канала посторонней программы
+	// Служба работает от SYSTEM, а этот тест создаёт канал от имени пользователя Windows.
 	owner, _, err := sd.Owner()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !owner.IsWellKnown(windows.WinLocalSystemSid) && !owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) {
-		t.Errorf("владелец канала %s, а приложение ждёт SYSTEM или администраторов", owner)
+	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !owner.IsWellKnown(windows.WinLocalSystemSid) && !owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) && owner.String() != user.User.Sid.String() {
+		t.Errorf("неожиданный владелец тестового канала: %s", owner)
 	}
 
 	dacl, _, err := sd.DACL()
